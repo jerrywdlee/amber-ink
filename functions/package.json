@@ -10,8 +10,15 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@google-cloud/firestore": "^8.2.0",
-    "@google-cloud/vertexai": "^1.10.0",
+    "@google-cloud/functions-framework": "^5.0.0",
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "mongodb": "^7.0.0",
     "nodemailer": "^7.0.12"
+  },
+  "devDependencies": {
+    "serverless": "^2.72.4",
+    "serverless-google-cloudfunctions": "^4.6.0"
   }
 }

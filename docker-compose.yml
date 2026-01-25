@@ -1,0 +1,106 @@
+services:
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  onboarding-agent:
+    build:
+      context: ./functions
+    environment:
+      - FUNCTION_TARGET=onboardingAgent
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - APP_ID=amber-ink
+    env_file:
+      - ./functions/.env
+    ports:
+      - "8081:8080"
+    depends_on:
+      - mongodb
+    command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
+
+  register-user:
+    build:
+      context: ./functions
+    environment:
+      - FUNCTION_TARGET=registerUser
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - APP_ID=amber-ink
+    env_file:
+      - ./functions/.env
+    ports:
+      - "8082:8080"
+    depends_on:
+      - mongodb
+    command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
+
+  get-user-data:
+    build:
+      context: ./functions
+    environment:
+      - FUNCTION_TARGET=getUserData
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - APP_ID=amber-ink
+    env_file:
+      - ./functions/.env
+    ports:
+      - "8085:8080"
+    depends_on:
+      - mongodb
+    command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
+
+  check-in:
+    build:
+      context: ./functions
+    environment:
+      - FUNCTION_TARGET=checkIn
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - APP_ID=amber-ink
+    env_file:
+      - ./functions/.env
+    ports:
+      - "8083:8080"
+    depends_on:
+      - mongodb
+    command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
+
+  ai-analyzer:
+    build:
+      context: ./functions
+    environment:
+      - FUNCTION_TARGET=aiAnalyzer
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - APP_ID=amber-ink
+    env_file:
+      - ./functions/.env
+    ports:
+      - "8086:8080"
+    depends_on:
+      - mongodb
+    command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
+
+  delivery-engine:
+    build:
+      context: ./functions
+    environment:
+      - FUNCTION_TARGET=deliveryEngine
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - APP_ID=amber-ink
+    env_file:
+      - ./functions/.env
+    ports:
+      - "8087:8080"
+    depends_on:
+      - mongodb
+    command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
+
+volumes:
+  mongodb_data:

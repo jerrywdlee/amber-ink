@@ -1,35 +1,399 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useState, useEffect, useRef } from 'react';
+import { Heart, Send, Calendar as CalendarIcon, ShieldCheck, User, MessageCircle, Award, Settings, Zap, Info } from 'lucide-react';
 
-function App() {
-  const [count, setCount] = useState(0)
+// --- Configuration ---
+const appId = import.meta.env.VITE_APP_ID || 'amber-ink';
+
+// --- Local Utils ---
+const getOrCreateUserId = () => {
+  let userId = localStorage.getItem('amber_ink_userId');
+  if (!userId) {
+    userId = 'user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('amber_ink_userId', userId);
+  }
+  return userId;
+};
+
+const GlassCard = ({ children, className = "" }) => (
+  <div className={`backdrop-blur-xl bg-white/40 border border-white/30 shadow-xl rounded-[2.5rem] ${className}`}>
+    {children}
+  </div>
+);
+
+const StreakCalendar = ({ userData }) => {
+  const rawCheckins = userData?.checkins || [];
+
+  // 1. 各チェックイン（ISO文字列）を日付（YYYY-MM-DD）に変換し、重複を排除
+  const checkins = [...new Set(rawCheckins.map(c => {
+    try {
+      return new Date(c).toISOString().split('T')[0];
+    } catch (e) {
+      return c.split('T')[0];
+    }
+  }))];
+
+  // 2. カレンダーの開始日を決定
+  // 直近5日間（今日を含む）の中で、最も古いチェックイン日を開始点にする
+  const thresholdDate = new Date();
+  thresholdDate.setDate(thresholdDate.getDate() - 4); // 今日を含めて5日間
+  const thresholdStr = thresholdDate.toISOString().split('T')[0];
+
+  const recentInWindow = checkins
+    .filter(d => d >= thresholdStr)
+    .sort((a, b) => a.localeCompare(b));
+
+  const startDate = recentInWindow.length > 0
+    ? new Date(recentInWindow[0])
+    : new Date();
+
+  // 3. 開始日から順に28日分の日付を順次生成（未来に向かって表示）
+  const days = Array.from({ length: 28 }, (_, i) => {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+    return date.toISOString().split('T')[0];
+  });
+
+  // 4. 今日から遡って連続しているチェックイン（現在のストリーク）を特定
+  const todayStr = new Date().toISOString().split('T')[0];
+  const currentStreakDays = [];
+  if (checkins.includes(todayStr)) {
+    let checkDate = new Date(todayStr);
+    while (checkins.includes(checkDate.toISOString().split('T')[0])) {
+      currentStreakDays.push(checkDate.toISOString().split('T')[0]);
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <GlassCard className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 text-amber-900 font-bold">
+          <Award className="w-5 h-5 text-amber-600" />
+          <span>継続ストリーク</span>
+        </div>
+        <span className="text-xs font-bold text-amber-700 bg-amber-200/50 px-3 py-1 rounded-full">
+          {checkins.length} DAYS
+        </span>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+      <div className="grid grid-cols-7 gap-y-3 gap-x-0">
+        {days.map((d, i) => {
+          const isChecked = checkins.includes(d);
+          const isToday = d === todayStr;
+          const isInCurrentStreak = currentStreakDays.includes(d);
+          const isDifferentMonth = new Date(d).getMonth() !== startDate.getMonth();
 
-export default App
+          // 接続ロジック: 前後の日がチェックイン済みか (同じ週内かどうかも考慮するとより正確ですが、まずはシンプルに時系列で)
+          const prevChecked = i > 0 && checkins.includes(days[i - 1]) && (i % 7 !== 0);
+          const nextChecked = i < days.length - 1 && checkins.includes(days[i + 1]) && (i % 7 !== 6);
+
+          let borderClasses = "border border-white/20";
+          let roundedClass = "rounded-xl";
+
+          if (isChecked) {
+            borderClasses = "border-y border-amber-500/20";
+            if (!prevChecked) {
+              borderClasses += " border-l border-amber-500/20";
+              roundedClass = "rounded-l-xl";
+            } else {
+              roundedClass = "rounded-l-none";
+            }
+            if (!nextChecked) {
+              borderClasses += " border-r border-amber-500/20";
+              roundedClass += " rounded-r-xl";
+            } else {
+              roundedClass += " rounded-r-none";
+            }
+          }
+
+          return (
+            <div
+              key={d}
+              className={`relative h-10 flex items-center justify-center text-[10px] font-bold transition-all duration-500
+                ${isDifferentMonth ? 'opacity-80' : 'opacity-100'}
+                ${isChecked
+                  ? isToday
+                    ? 'bg-linear-to-br from-amber-400 to-amber-600 text-white shadow-inner z-10'
+                    : 'bg-amber-400/20 text-amber-700 z-10'
+                  : 'bg-white/30 text-amber-300'}
+                ${borderClasses}
+                ${roundedClass}
+                ${isToday ? 'ring-2 ring-amber-500 ring-offset-2 ring-offset-[#fff7e6] scale-110 z-20 shadow-lg shadow-amber-500/40 relative' : ''}
+                ${isInCurrentStreak && !isToday ? 'ring-1 ring-amber-500/30' : ''}
+              `}
+            >
+              {d.split('-')[2]}
+            </div>
+          );
+        })}
+      </div>
+    </GlassCard>
+  );
+};
+
+export default function App() {
+  const [userId] = useState(getOrCreateUserId());
+  const [userData, setUserData] = useState(null);
+  const [mode, setMode] = useState('registration'); // 'registration', 'dashboard'
+  const [regType, setRegType] = useState('chat'); // 'chat' or 'form'
+  const [chatMessages, setChatMessages] = useState(() => {
+    const saved = localStorage.getItem('amber_ink_chat_history');
+    if (saved) return JSON.parse(saved);
+    return [
+      { role: 'ai', text: 'こんにちは。Amber Inkへようこそ。私はあなたの「生きた証」を宝石のように守るお手伝いをします。' },
+      { role: 'ai', text: 'まずは、あなたのお名前（ニックネームでも構いません）を教えていただけますか？' },
+    ];
+  });
+
+  useEffect(() => {
+    // 5 turn (10 messages) limit
+    const lastTurns = chatMessages.slice(-10);
+    localStorage.setItem('amber_ink_chat_history', JSON.stringify(lastTurns));
+  }, [chatMessages]);
+
+  const [inputValue, setInputValue] = useState('');
+  const [formData, setFormData] = useState({ name: '', interest: '', emergency: '' });
+  const chatEndRef = useRef(null);
+
+  // 初回データ読込
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${userId}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setUserData(data);
+          setMode('dashboard');
+        }
+      } catch (error) {
+        console.error("Load error:", error);
+      }
+    };
+    fetchUserData();
+  }, [userId]);
+
+  // 定期的なデータ更新 (プロトタイプ用の簡易的なポーリング)
+  useEffect(() => {
+    if (mode === 'dashboard') {
+      const interval = setInterval(async () => {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${userId}`, {
+            headers: { 'Authorization': `Bearer ${userId}` }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setUserData(data);
+          }
+        } catch (e) { }
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [mode, userId]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const saveUserData = async (data) => {
+    try {
+      const response = await fetch(import.meta.env.VITE_REGISTER_USER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
+        },
+        body: JSON.stringify({
+          userId: userId,
+          name: data.name,
+          interest: data.interest,
+          emergency_contact: data.emergency
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed');
+      }
+
+      const result = await response.json();
+      console.log('User registered:', result);
+
+      // 再取得してダッシュボードへ
+      setMode('dashboard');
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert(`登録に失敗しました: ${error.message}`);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim()) return;
+    const userMsg = inputValue;
+    setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setInputValue('');
+
+    try {
+      const response = await fetch(import.meta.env.VITE_CLOUD_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
+        },
+        body: JSON.stringify({ userId: userId, message: userMsg, prevMessages: chatMessages.slice(-5) })
+      });
+      const data = await response.json();
+
+      // [SPLIT] でメッセージを分割して順次表示
+      const messages = data.text.split('[SPLIT]').map(s => s.trim()).filter(s => s);
+
+      for (const msg of messages) {
+        // 前のメッセージの長さに応じてディレイを計算 (200ms - 800ms)
+        const delay = Math.min(Math.max(msg.length * 20, 200), 800);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        setChatMessages(prev => [...prev, { role: 'ai', text: msg }]);
+      }
+
+      if (data.is_complete) {
+        // AIによる登録完了時、画面を切り替えるために少し待機して再読込
+        setTimeout(() => setMode('dashboard'), 2000);
+      }
+    } catch (error) {
+      console.error("AI 疎通エラー:", error);
+      setTimeout(() => {
+        setChatMessages(prev => [...prev, { role: 'ai', text: "すみません、少し通信が不安定なようです。もう一度お願いできますか？" }]);
+      }, 800);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#fff7e6] to-[#ffedcc] text-slate-800 p-4 font-sans max-w-md mx-auto relative overflow-hidden">
+      <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 -left-20 w-48 h-48 bg-orange-400/20 rounded-full blur-3xl" />
+
+      <header className="flex items-center justify-between mb-8 pt-4 relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
+            <Heart className="w-6 h-6 fill-current" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-amber-900 leading-none">Amber Ink</h1>
+            <p className="text-[10px] text-amber-700/70 font-medium uppercase tracking-widest mt-1">Preserving Life's Glow</p>
+          </div>
+        </div>
+        {mode === 'registration' && (
+          <button
+            onClick={() => setRegType(regType === 'chat' ? 'form' : 'chat')}
+            className="p-2 bg-white/50 backdrop-blur-md rounded-full border border-white/50 text-amber-700 shadow-sm"
+          >
+            {regType === 'chat' ? <Zap className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
+          </button>
+        )}
+      </header>
+
+      {mode === 'registration' ? (
+        <div className="relative z-10 flex flex-col h-[78vh]">
+          {regType === 'chat' ? (
+            <>
+              <div className="flex-1 overflow-y-auto space-y-4 pb-4 px-1 scrollbar-hide">
+                {chatMessages.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] p-4 rounded-3xl shadow-sm transition-all duration-300 whitespace-pre-wrap ${m.role === 'user'
+                      ? 'bg-linear-to-br from-amber-500 to-amber-600 text-white rounded-tr-none'
+                      : 'bg-white/70 backdrop-blur-md border border-white/50 rounded-tl-none text-amber-900'
+                      }`}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              <GlassCard className="p-2 rounded-full flex items-center mt-4">
+                <input
+                  className="flex-1 bg-transparent px-5 py-3 outline-none text-amber-900 placeholder-amber-700/50"
+                  placeholder="想いを入力..."
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  className="w-11 h-11 bg-amber-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-95 transition-transform"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </GlassCard>
+            </>
+          ) : (
+            <GlassCard className="p-8 space-y-6 animate-in zoom-in duration-300">
+              <div className="flex items-center gap-2 text-amber-800 font-bold mb-2">
+                <Settings className="w-5 h-5" />
+                <h2>クイック登録</h2>
+              </div>
+              <div className="space-y-4 text-sm">
+                <div>
+                  <label className="block text-amber-700 mb-1 ml-2">お名前</label>
+                  <input className="w-full p-4 rounded-2xl bg-white/50 border border-white/50 focus:ring-2 ring-amber-400 outline-none" placeholder="琥珀 太郎" onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-amber-700 mb-1 ml-2">興味・関心</label>
+                  <input className="w-full p-4 rounded-2xl bg-white/50 border border-white/50 focus:ring-2 ring-amber-400 outline-none" placeholder="園芸、最新ニュース" onChange={e => setFormData({ ...formData, interest: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-amber-700 mb-1 ml-2">緊急連絡先 (Email・携帯番号など)</label>
+                  <input className="w-full p-4 rounded-2xl bg-white/50 border border-white/50 focus:ring-2 ring-amber-400 outline-none" placeholder="Email、電話番号、LINE IDなど" onChange={e => setFormData({ ...formData, emergency: e.target.value })} />
+                </div>
+                <button
+                  onClick={() => saveUserData(formData)}
+                  className="w-full py-4 bg-amber-500 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/30 active:scale-95 transition-transform"
+                >
+                  登録を完了する
+                </button>
+              </div>
+            </GlassCard>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in slide-in-from-bottom duration-700 relative z-10">
+          <GlassCard className="bg-gradient-to-br from-amber-400/80 to-amber-600/80 p-8 text-white border-white/40 shadow-amber-500/20">
+            <p className="text-amber-100 text-xs font-bold uppercase tracking-widest mb-1">Welcome back</p>
+            <h2 className="text-3xl font-bold mb-2 leading-tight">
+              {(() => {
+                const hour = new Date().getHours();
+                if (hour >= 5 && hour < 11) return 'おはよう、';
+                if (hour >= 11 && hour < 18) return 'こんにちは、';
+                return 'こんばんは、';
+              })()}
+              <br />
+              {userData?.name ? `${userData.name}さん` : 'あなた'}
+            </h2>
+            <p className="text-sm opacity-90 leading-relaxed font-medium">今日もあなたの「生きた証」を、<br />宝石のように輝かせましょう。</p>
+          </GlassCard>
+
+          <StreakCalendar userData={userData} />
+
+          <div className="grid grid-cols-2 gap-4">
+            <GlassCard className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+              <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center">
+                <ShieldCheck className="w-7 h-7 text-amber-600" />
+              </div>
+              <span className="text-xs font-bold text-amber-900 uppercase">宝石箱</span>
+            </GlassCard>
+            <GlassCard className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+              <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center">
+                <User className="w-7 h-7 text-amber-600" />
+              </div>
+              <span className="text-xs font-bold text-amber-900 uppercase">アカウント</span>
+            </GlassCard>
+          </div>
+
+          <div className="p-6 rounded-3xl border border-white/40 bg-white/20 backdrop-blur-sm italic text-amber-900/60 text-center text-xs font-medium">
+            "どんなに小さな一滴も、いつか美しい琥珀になる。"
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

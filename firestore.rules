@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Amber Ink - セキュアなFirestore Security Rules
+    // 原則: すべての書き込みはCloud Functions経由、読み取りのみ認証済みユーザーに許可
+    
+    match /artifacts/{appId}/public/data/users/{userId} {
+      // 読み取り: 認証済みユーザーは自分のデータのみ読み取り可能
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // 書き込み: すべて拒否（Cloud Functions経由のみ）
+      allow write: false;
+    }
+    
+    match /artifacts/{appId}/public/data/sessions/{sessionId} {
+      // セッションデータ（対話型登録の一時データ）
+      // 読み取り: 認証済みユーザーは自分のセッションのみ読み取り可能
+      allow read: if request.auth != null && request.auth.uid == sessionId;
+      
+      // 書き込み: すべて拒否（Cloud Functions経由のみ）
+      allow write: false;
+    }
+    
+    // その他すべてのパスへのアクセスを拒否
+    match /{document=**} {
+      allow read, write: false;
+    }
+  }
+}
