@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Send, Calendar as CalendarIcon, ShieldCheck, User, MessageCircle, Award, Settings, Zap, Info } from 'lucide-react';
+import { Heart, Send, Calendar as CalendarIcon, ShieldCheck, User, MessageCircle, Award, Settings, Zap, Info, Gem } from 'lucide-react';
 
 // --- Configuration ---
 const appId = import.meta.env.VITE_APP_ID || 'amber-ink';
@@ -135,6 +135,7 @@ export default function App() {
   const [userData, setUserData] = useState(null);
   const [mode, setMode] = useState('registration'); // 'registration', 'dashboard'
   const [regType, setRegType] = useState('chat'); // 'chat' or 'form'
+  const [isTyping, setIsTyping] = useState(false);
   const [chatMessages, setChatMessages] = useState(() => {
     const saved = localStorage.getItem('amber_ink_chat_history');
     if (saved) return JSON.parse(saved);
@@ -195,7 +196,7 @@ export default function App() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  }, [chatMessages, isTyping]);
 
   const saveUserData = async (data) => {
     try {
@@ -235,6 +236,8 @@ export default function App() {
     setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setInputValue('');
 
+    setIsTyping(true);
+
     try {
       const response = await fetch(import.meta.env.VITE_CLOUD_FUNCTION_URL, {
         method: 'POST',
@@ -251,20 +254,21 @@ export default function App() {
 
       for (const msg of messages) {
         // 前のメッセージの長さに応じてディレイを計算 (200ms - 800ms)
-        const delay = Math.min(Math.max(msg.length * 20, 200), 800);
+        const delay = Math.min(Math.max(msg.length * 20, 200), 1600);
         await new Promise(resolve => setTimeout(resolve, delay));
         setChatMessages(prev => [...prev, { role: 'ai', text: msg }]);
       }
+
+      setIsTyping(false);
 
       if (data.is_complete) {
         // AIによる登録完了時、画面を切り替えるために少し待機して再読込
         setTimeout(() => setMode('dashboard'), 2000);
       }
     } catch (error) {
-      console.error("AI 疎通エラー:", error);
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, { role: 'ai', text: "すみません、少し通信が不安定なようです。もう一度お願いできますか？" }]);
-      }, 800);
+      console.error('Error sending message:', error);
+      setIsTyping(false);
+      setChatMessages(prev => [...prev, { role: 'ai', text: '申し訳ありません。接続に失敗しました。琥珀の輝きを取り戻すため、もう一度お試しいただけますか？' }]);
     }
   };
 
@@ -308,6 +312,18 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+                {isTyping && (
+                  <div className="flex justify-start animate-in fade-in duration-500">
+                    <div className="bg-white/60 backdrop-blur-md px-6 py-3 rounded-2xl rounded-bl-sm border border-white/40 shadow-sm flex items-center gap-2">
+                      <div className="flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                        <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce"></span>
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-900 uppercase tracking-widest opacity-60">入力中...</span>
+                    </div>
+                  </div>
+                )}
                 <div ref={chatEndRef} />
               </div>
               <GlassCard className="p-2 rounded-full flex items-center mt-4">
@@ -377,9 +393,9 @@ export default function App() {
           <div className="grid grid-cols-2 gap-4">
             <GlassCard className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform">
               <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center">
-                <ShieldCheck className="w-7 h-7 text-amber-600" />
+                <Gem className="w-7 h-7 text-amber-600" />
               </div>
-              <span className="text-xs font-bold text-amber-900 uppercase">宝石箱</span>
+              <span className="text-xs font-bold text-amber-900 uppercase">琥珀の宝石箱</span>
             </GlassCard>
             <GlassCard className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform">
               <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center">
