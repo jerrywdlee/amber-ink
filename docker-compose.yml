@@ -102,5 +102,21 @@ services:
       - mongodb
     command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
 
+  companion-agent:
+    build:
+      context: ./functions
+    environment:
+      - FUNCTION_TARGET=runCompanionAgent
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MONGODB_URI=mongodb://mongodb:27017
+      - APP_ID=amber-ink
+    env_file:
+      - ./functions/.env
+    ports:
+      - "8088:8080"
+    depends_on:
+      - mongodb
+    command: sh -c 'exec npx @google-cloud/functions-framework --target=$$FUNCTION_TARGET'
+
 volumes:
   mongodb_data:

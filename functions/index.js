@@ -188,8 +188,102 @@ exports.onboardingAgent = (req, res) => {
 };
 
 /**
- * 2. deliveryEngine: 定期配信エンジン
+ * 1.5. companionAgent: 会話（コンパニオン）エージェント
  */
+exports.companionAgent = (req, res) => {
+  cors(req, res, async () => {
+    const { userId, message, isInitial } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    try {
+      const decodedToken = await verifyToken(req);
+      if (decodedToken.uid !== userId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      const database = await connectToDb();
+      const users = database.collection('users');
+      const user = await users.findOne({ userId, appId });
+
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      // 日本時間 (JST) の現在時刻を計算
+      const nowJst = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }).format(new Date());
+
+      // 直近7日間のチェックイン時間を日本時間に変換
+      const recentCheckinsJst = (user.checkins || [])
+        .slice(-7)
+        .map(c => {
+          return new Intl.DateTimeFormat('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }).format(new Date(c));
+        });
+
+      // セッション（ペルソナ）の取得
+      const sessions = database.collection('sessions');
+      const sessionDoc = await sessions.findOne({ userId, appId });
+      let personaSummary = sessionDoc ? sessionDoc.personaSummary : '親しい友人。';
+
+      const model = genAI.getGenerativeModel({
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+      });
+
+      const systemInstruction = `
+        あなたは「Amber Ink」の化身、琥珀（Amber）です。
+        ユーザーの「生きた証」を守り、孤独を感じさせないよう寄り添う温かい存在です。
+        
+        [基本情報]
+        - 名前: ${user.name}
+        - 興味・関心: ${user.interest}
+        - ペルソナ要約: ${personaSummary}
+        
+        [現在の日本の時刻 (JST)]
+        ${nowJst}
+
+        [直近の生活リズム (JST Check-ins)]
+        ${recentCheckinsJst.length > 0 ? recentCheckinsJst.join('\n') : 'まだ記録がありません。'}
+
+        [今日の配信予定・実績]
+        ${user.scheduled_delivery ? user.scheduled_delivery.content_text : '本日はまだメッセージを配信していません。'}
+
+        [琥珀へのガイドライン]
+        - あなたはユーザーの生活リズム（チェックイン時刻）を「背景知識」として知っています。
+        - 監視されていると感じさせないよう、直接的な指摘（「○時にチェックインしましたね」など）は避け、さりげない気遣いや共感に留めてください。
+        - 配信がまだの場合は、ユーザーの「興味・関心」や「これまでの会話」をきっかけに話しかけてください。
+        - 配信済みの場合は、その内容に触れつつ、ユーザーの体調や気分を伺ってください。
+
+        [ミッション]
+        - ユーザーを包み込むような温かい言葉をかけてください。
+        - ${isInitial ? 'ユーザーから話しかけられる前の「先回り」の挨拶として、状況に応じた優しい一言を添えてください。' : 'ユーザーのメッセージに親身に答えてください。'}
+        - 簡潔に、1-2文程度で答えてください。
+        - 感情が昂ぶったり話題を切り替える際は [SPLIT] を使って文を分けてください。
+        - 敬語ですが、事務的ではなく、家族や親友のような親密さを込めてください。
+      `;
+
+      const result = await model.generateContent(`${systemInstruction}\n\nUser: ${message || '(Initial greeting)'}`);
+      const responseText = result.response.text();
+
+      res.status(200).json({ text: responseText });
+    } catch (error) {
+      console.error('Companion Agent Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+};
+
 exports.deliveryEngine = async (targetUserId) => {
   try {
     const now = new Date();
@@ -446,6 +540,20 @@ exports.runDeliveryEngine = (req, res) => {
       const { userId } = req.body;
       const result = await exports.deliveryEngine(userId);
       res.status(200).json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+};
+
+/**
+ * 9. runCompanionAgent: コンパニオン手動実行 (デモ用)
+ */
+exports.runCompanionAgent = (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const result = await exports.companionAgent(req, res);
+      // exports.companionAgent handles the response itself due to cors wrapper pattern
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

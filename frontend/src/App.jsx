@@ -5,6 +5,8 @@ import { Heart, Send, Calendar as CalendarIcon, ShieldCheck, User, MessageCircle
 const appId = import.meta.env.VITE_APP_ID || 'amber-ink';
 
 // --- Local Utils ---
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const getOrCreateUserId = () => {
   let userId = localStorage.getItem('amber_ink_userId');
   if (!userId) {
@@ -165,16 +167,28 @@ export default function App() {
       { role: 'ai', text: 'まずは、あなたのお名前（ニックネームでも構いません）を教えていただけますか？' },
     ];
   });
+  const [companionMessages, setCompanionMessages] = useState(() => {
+    const saved = localStorage.getItem(`amber_ink_companion_history_${userId}`);
+    if (saved) return JSON.parse(saved);
+    return [];
+  });
+  const [isTypingCompanion, setIsTypingCompanion] = useState(false);
 
   useEffect(() => {
     // 5 turn (10 messages) limit
     const lastTurns = chatMessages.slice(-10);
     localStorage.setItem('amber_ink_chat_history', JSON.stringify(lastTurns));
   }, [chatMessages]);
+  useEffect(() => {
+    if (userId) {
+      localStorage.setItem(`amber_ink_companion_history_${userId}`, JSON.stringify(companionMessages));
+    }
+  }, [companionMessages, userId]);
 
   const [inputValue, setInputValue] = useState('');
   const [formData, setFormData] = useState({ name: '', interest: '', emergency: '' });
   const chatEndRef = useRef(null);
+  const companionChatEndRef = useRef(null);
 
   // 初回データ読込
   useEffect(() => {
@@ -273,6 +287,10 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isTyping]);
 
+  useEffect(() => {
+    companionChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [companionMessages, isTypingCompanion]);
+
   const saveUserData = async (data) => {
     try {
       const response = await fetch(import.meta.env.VITE_REGISTER_USER_URL, {
@@ -308,6 +326,95 @@ export default function App() {
     }
   };
 
+  const startCompanionChat = async () => {
+    setMode('companion');
+    if (companionMessages.length === 0) {
+      setIsTypingCompanion(true);
+
+      const hour = new Date().getHours();
+      let greeting = "こんにちは。";
+      if (hour >= 5 && hour < 11) greeting = "おはよう。今日も話かけてくれて、とても嬉しいです。";
+      else if (hour >= 18 || hour < 5) greeting = "こんばんは。今日も一日お疲れ様。夜はゆっくり心身を休めてくださいね。";
+      else greeting = "こんにちは。少し一息つかない？あなたのこと、もっと聞かせて。";
+
+      // 1. Start fetching AI proactive comment in parallel
+      const aiPromise = fetch(import.meta.env.VITE_COMPANION_AGENT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
+        },
+        body: JSON.stringify({ userId, isInitial: true })
+      }).then(r => r.json()).catch(e => {
+        console.error("Companion AI error:", e);
+        return null;
+      });
+
+      // 2. Immediate greeting animation
+      await delay(1200);
+      setCompanionMessages([{ role: 'ai', text: greeting }]);
+      setIsTypingCompanion(false);
+
+      // 3. Wait for AI response
+      setIsTypingCompanion(true);
+      const data = await aiPromise;
+
+      if (data && data.text) {
+        const messages = data.text.split('[SPLIT]').filter(t => t.trim());
+        let currentMessages = [{ role: 'ai', text: greeting }];
+
+        for (const msg of messages) {
+          setIsTypingCompanion(true);
+          const waitTime = Math.max(1500, msg.length * 50);
+          await delay(waitTime);
+          currentMessages = [...currentMessages, { role: 'ai', text: msg.trim() }];
+          setCompanionMessages(currentMessages);
+          setIsTypingCompanion(false);
+        }
+      } else {
+        setIsTypingCompanion(false);
+      }
+    }
+  };
+
+  const handleSendCompanionMessage = async () => {
+    if (!inputValue.trim() || isTypingCompanion) return;
+    const userMsg = inputValue.trim();
+    setInputValue('');
+    const newMessages = [...companionMessages, { role: 'user', text: userMsg }];
+    setCompanionMessages(newMessages);
+    setIsTypingCompanion(true);
+
+    try {
+      const response = await fetch(import.meta.env.VITE_COMPANION_AGENT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
+        },
+        body: JSON.stringify({ userId, message: userMsg })
+      });
+      const data = await response.json();
+      if (data.text) {
+        const messages = data.text.split('[SPLIT]').filter(t => t.trim());
+        let currentMessages = [...newMessages];
+
+        for (const msg of messages) {
+          setIsTypingCompanion(true);
+          const waitTime = Math.max(1500, msg.length * 50);
+          await delay(waitTime);
+          currentMessages = [...currentMessages, { role: 'ai', text: msg.trim() }];
+          setCompanionMessages(currentMessages);
+          setIsTypingCompanion(false);
+        }
+      }
+    } catch (e) {
+      console.error("Companion chat error:", e);
+    } finally {
+      setIsTypingCompanion(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
     const userMsg = inputValue;
@@ -332,8 +439,8 @@ export default function App() {
 
       for (const msg of messages) {
         // 前のメッセージの長さに応じてディレイを計算 (200ms - 800ms)
-        const delay = Math.min(Math.max(msg.length * 20, 200), 1600);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        const msgDelay = Math.min(Math.max(msg.length * 20, 200), 1600);
+        await delay(msgDelay);
         setChatMessages(prev => [...prev, { role: 'ai', text: msg }]);
       }
 
@@ -418,6 +525,14 @@ export default function App() {
             {regType === 'chat' ? <Zap className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
           </button>
         )}
+        {mode === 'companion' && (
+          <button
+            onClick={() => setMode('dashboard')}
+            className="px-4 py-2 bg-white/50 backdrop-blur-md rounded-full border border-white/50 text-amber-700 shadow-sm text-xs font-bold"
+          >
+            戻る
+          </button>
+        )}
       </header>
 
       {mode === 'registration' ? (
@@ -494,6 +609,49 @@ export default function App() {
             </GlassCard>
           )}
         </div>
+      ) : mode === 'companion' ? (
+        <div className="relative z-10 flex flex-col h-[78vh]">
+          <div className="flex-1 overflow-y-auto space-y-4 pb-4 px-1 scrollbar-hide">
+            {companionMessages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] p-4 rounded-3xl shadow-sm transition-all duration-300 whitespace-pre-wrap ${m.role === 'user'
+                  ? 'bg-linear-to-br from-amber-500 to-amber-600 text-white rounded-tr-none'
+                  : 'bg-white/70 backdrop-blur-md border border-white/50 rounded-tl-none text-amber-900 font-medium'
+                  }`}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {isTypingCompanion && (
+              <div className="flex justify-start animate-in fade-in duration-500">
+                <div className="bg-white/60 backdrop-blur-md px-6 py-3 rounded-2xl rounded-bl-sm border border-white/40 shadow-sm flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce"></span>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-900 uppercase tracking-widest opacity-60">琥珀が入力中...</span>
+                </div>
+              </div>
+            )}
+            <div ref={companionChatEndRef} />
+          </div>
+          <GlassCard className="p-2 rounded-full flex items-center mt-4 border-amber-200/50 shadow-amber-500/10">
+            <input
+              className="flex-1 bg-transparent px-5 py-3 outline-none text-amber-900 placeholder-amber-700/50 font-medium"
+              placeholder="琥珀に話しかける..."
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendCompanionMessage()}
+            />
+            <button
+              onClick={handleSendCompanionMessage}
+              className="w-11 h-11 bg-amber-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-95 transition-transform"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </GlassCard>
+        </div>
       ) : (
         <div className="space-y-6 animate-in slide-in-from-bottom duration-700 relative z-10">
           <GlassCard className="bg-gradient-to-br from-amber-400/80 to-amber-600/80 p-8 text-white border-white/40 shadow-amber-500/20">
@@ -520,11 +678,11 @@ export default function App() {
               </div>
               <span className="text-xs font-bold text-amber-900 uppercase">琥珀の宝石箱</span>
             </GlassCard>
-            <GlassCard className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+            <GlassCard onClick={startCompanionChat} className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform cursor-pointer">
               <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center">
-                <User className="w-7 h-7 text-amber-600" />
+                <MessageCircle className="w-7 h-7 text-amber-600" />
               </div>
-              <span className="text-xs font-bold text-amber-900 uppercase">アカウント</span>
+              <span className="text-xs font-bold text-amber-900 uppercase">琥珀との語らい</span>
             </GlassCard>
             <GlassCard
               onClick={triggerDeliveryTest}
