@@ -88,7 +88,7 @@ export const RegistrationView = ({
                         />
                     </div>
                     <div>
-                        <label className="block text-amber-700 mb-1 ml-2">緊急連絡先 (Email・携帯番号など)</label>
+                        <label className="block text-amber-700 mb-1 ml-2">見守りサポーター (Email・携帯番号など)</label>
                         <input
                             className="w-full p-4 rounded-2xl bg-white/50 border border-white/50 focus:ring-2 ring-amber-400 outline-none"
                             placeholder="Email、電話番号、LINE IDなど"

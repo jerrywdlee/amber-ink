@@ -8,6 +8,8 @@ const { MongoClient } = require('mongodb');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cors = require('cors')({ origin: true });
 const deliveryService = require('./delivery');
+const path = require('path');
+const ejs = require('ejs');
 
 const uri = process.env.MONGODB_URI || 'mongodb://mongodb:27017';
 const dbName = process.env.MONGODB_DB_NAME || 'amber_ink';
@@ -237,10 +239,8 @@ exports.companionAgent = (req, res) => {
           }).format(new Date(c));
         });
 
-      // セッション（ペルソナ）の取得
-      const sessions = database.collection('sessions');
-      const sessionDoc = await sessions.findOne({ userId, appId });
-      let personaSummary = sessionDoc ? sessionDoc.personaSummary : '親しい友人。';
+      // ペルソナ要約の取得 (現在は個別ユーザーデータ内に保存されている)
+      let personaSummary = user.personaSummary || '親しい友人。';
 
       const model = genAI.getGenerativeModel({
         model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
@@ -283,14 +283,14 @@ exports.companionAgent = (req, res) => {
 
         [テスト配信（テストデリバリー）フロー]
         ユーザーがテスト配信（デマ配信テスト、生存確認テストなど）を希望している、またはそれに関連する対話を行っている場合、以下のステップを温かく、かつ正確に進めてください。
-        1. 宛先の提示と選択: ユーザーに「自分宛」か「緊急連絡先宛」かを確認してください。その際、現在登録されている情報を正確に提示してください：
+        1. 宛先の提示と選択: ユーザーに「自分宛」か「見守りサポーター宛」かを確認してください。その際、現在登録されている情報を正確に提示してください：
            - 自分(${user.contact_method}): ${user.contact}
-           - 緊急連絡先(${user.emergency_method}): ${user.emergency_contact}
-        2. 内容の復唱と最終確認: ユーザーが宛先を選択したら、「[自分宛/緊急連絡先]の[実際の連絡先]へ、配信テストを行ってもよろしいですか？」と復唱して最終確認を取ってください。
+           - 見守りサポーター(${user.emergency_method}): ${user.emergency_contact}
+        2. 内容の復唱と最終確認: ユーザーが宛先を選択したら、「[自分宛/見守りサポーター宛]の[実際の連絡先]へ、配信テストを行ってもよろしいですか？」と復唱して最終確認を取ってください。
         3. 実行の合図: ユーザーが「はい」や「お願いします」など、明確に実行を承諾する返答をしたら、JSONの "test_delivery_trigger" フィールドに "self" または "emergency" をセットしてください。それ以外のステップでは null にしてください。
 
         [プロフィール・ペルソナ更新]
-        - 会話の中で、ユーザーが自分の情報（名前、興味関心、連絡先、緊急連絡先など）を変更したいと言及した場合、その情報を抽出してください。
+        - 会話の中で、ユーザーが自分の情報（名前、興味関心、連絡先、見守りサポーターなど）を変更したいと言及した場合、その情報を抽出してください。
         - 会話を通じてユーザーへの理解が深まった場合、これまでの「ペルソナ要約」をより正確で温かみのある内容に更新してください。
         - 変更した項目のみを抽出し、それ以外は null または空のオブジェクトを返してください。
 
@@ -305,8 +305,8 @@ exports.companionAgent = (req, res) => {
             "interest": "変更後の興味関心",
             "contact": "変更後の連絡先",
             "contact_method": "変更後の連絡方法",
-            "emergency_contact": "変更後の緊急連絡先",
-            "emergency_method": "変更後の緊急連絡方法"
+            "emergency_contact": "変更後の見守りサポーターの連絡先",
+            "emergency_method": "変更後の見守りサポーターの連絡方法"
           },
           "updated_persona_summary": "更新されたペルソナ要約（変更がある場合のみ）",
           "test_delivery_trigger": "self" | "emergency" | null
@@ -315,6 +315,8 @@ exports.companionAgent = (req, res) => {
 
       const result = await model.generateContent(`${systemInstruction}\n\nUser: ${message || '(Initial greeting)'}`);
       const responseData = JSON.parse(cleanJson(result.response.text()));
+
+      console.log(`responseData: ${JSON.stringify(responseData)}`);
 
       // プロフィール更新がある場合は DB に反映
       if (responseData.updated_profile && Object.keys(responseData.updated_profile).length > 0) {
@@ -333,17 +335,16 @@ exports.companionAgent = (req, res) => {
 
       // ペルソナ要約の更新
       if (responseData.updated_persona_summary) {
-        await sessions.updateOne(
+        await users.updateOne(
           { userId, appId },
           {
             $set: {
               personaSummary: responseData.updated_persona_summary,
               updatedAt: new Date()
             }
-          },
-          { upsert: true }
+          }
         );
-        console.log(`Persona summary updated for user ${userId}`);
+        console.log(`Persona summary updated for user ${userId} (in users collection)`);
       }
 
       // テスト配信トリガーの処理
@@ -442,8 +443,8 @@ exports.aiAnalyzer = async (targetUserId) => {
       Create a personalized greeting and short news snippets for ${user.name} based on their interests: "${user.interest}".
       
       [Guidelines for Multi-Interest Users]
-      - Split the user's interests by commas or context.
-      - For EACH interest, create one separate "snippet".
+      - Split the user's interests by commas, spaces, or context (e.g., "テニス 料理" or "園芸、読書").
+      - For EACH distinct interest, create one separate "snippet".
       - Snippets should be short (1-2 sentences) and include a brief interesting fact or warm thought related to that specific hobby.
       - Do NOT mix different hobbies in a single snippet.
       
@@ -569,6 +570,11 @@ exports.registerUser = (req, res) => {
 
       const database = await connectToDb();
       const users = database.collection('users');
+      const sessions = database.collection('sessions');
+
+      // セッションからペルソナ要約を読み取る
+      const sessionDoc = await sessions.findOne({ userId, appId });
+      const personaSummary = sessionDoc ? sessionDoc.personaSummary : '親しい友人。';
 
       const userData = {
         userId,
@@ -576,6 +582,7 @@ exports.registerUser = (req, res) => {
         name: name.trim(),
         interest: interest.trim(),
         emergency_contact: emergency_contact.trim(),
+        personaSummary: personaSummary, // セッションから移行
         status: 'active',
         created_at: new Date().toISOString(),
         checkins: [], // Removed initial check-in
@@ -584,7 +591,19 @@ exports.registerUser = (req, res) => {
       };
 
       await users.updateOne({ userId, appId }, { $set: userData }, { upsert: true });
-      res.status(201).json({ success: true, userId });
+
+      // 最新のデータを取得して返す
+      const savedUser = await users.findOne({ userId, appId });
+
+      // 登録完了後、セッションを削除してクリーンアップ
+      try {
+        await sessions.deleteOne({ userId, appId });
+        console.log(`Session cleaned up for user ${userId}`);
+      } catch (e) {
+        console.error('Session cleanup failed:', e);
+      }
+
+      res.status(201).json(savedUser);
     } catch (error) {
       console.error('Registration Error:', error);
       res.status(500).json({ error: error.message });
@@ -696,6 +715,43 @@ exports.runEmergencyMonitor = (req, res) => {
       const result = await exports.emergencyMonitor();
       res.status(200).json(result);
     } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+};
+
+/**
+ * 11. downloadMemorial: 記念ページ生成・ダウンロード
+ */
+exports.downloadMemorial = (req, res) => {
+  cors(req, res, async () => {
+    const userId = req.query.uid;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    try {
+      const database = await connectToDb();
+      const user = await database.collection('users').findOne({ userId, appId });
+
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const templatePath = path.join(__dirname, 'templates', 'memorial', 'page.html.ejs');
+
+      const lastSeen = user.last_seen ? new Date(user.last_seen) : new Date(user.created_at);
+      const templateData = {
+        name: user.name,
+        interest: user.interest,
+        personaSummary: user.personaSummary || '大切な会員様として、琥珀が見守り続けました。',
+        last_seen_formatted: lastSeen.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+        generated_at: new Date().toLocaleDateString('ja-JP')
+      };
+
+      const html = await ejs.renderFile(templatePath, templateData);
+
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Content-Disposition', `attachment; filename="memorial_${userId}.html"`);
+      res.send(html);
+    } catch (error) {
+      console.error('Download Memorial Error:', error);
       res.status(500).json({ error: error.message });
     }
   });

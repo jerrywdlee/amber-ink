@@ -26,7 +26,8 @@ class EmailStrategy extends BaseDeliveryStrategy {
     let templateDir = 'daily';
     let templateData = {
       name: user.name,
-      checkInUrl: checkInUrl
+      checkInUrl: checkInUrl,
+      familySupportUrl: `${baseUrl}/?view=emergency&uid=${user.userId}`
     };
 
     // Determine recipient and template based on type and override
@@ -41,7 +42,7 @@ class EmailStrategy extends BaseDeliveryStrategy {
     if (targetOverride) {
       // It's a test delivery
       templateDir = 'test';
-      templateData.target_label = targetOverride === 'self' ? '自分' : '緊急連絡先';
+      templateData.target_label = targetOverride === 'self' ? '自分' : '見守りサポーター';
       if (targetOverride === 'self') recipient = user.contact;
     } else if (type === 'daily') {
       templateData.snippets = user.scheduled_delivery?.snippets || [];
@@ -55,7 +56,7 @@ class EmailStrategy extends BaseDeliveryStrategy {
     const html = await ejs.renderFile(htmlPath, templateData);
     const text = await ejs.renderFile(txtPath, templateData);
 
-    const subject = type === 'emergency' ? `【重要/緊急】Amber Ink よりお知らせ` :
+    const subject = type === 'emergency' ? `【重要/緊急】Amber Ink から「見守りサポーター」様へお知らせ` :
       targetOverride ? `【テスト配信】Amber Ink 動作確認` :
         `琥珀の輝き：今日の ${user.name} さんへ`;
 

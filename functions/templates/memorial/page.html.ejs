@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= name %> さんの生きた証 - Amber Ink
+    </title>
+    <style>
+        :root {
+            --amber-50: #fffbeb;
+            --amber-100: #fef3c7;
+            --amber-400: #fbbf24;
+            --amber-600: #d97706;
+            --slate-800: #1e293b;
+            --slate-600: #475569;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background: linear-gradient(135deg, #fffcf0 0%, #fff7e6 100%);
+            color: var(--slate-800);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 40px;
+            padding: 50px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+            border: 1px solid white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin: 0 0 10px 0;
+            color: var(--slate-800);
+        }
+
+        .subtitle {
+            color: var(--amber-600);
+            font-weight: bold;
+            letter-spacing: 0.1em;
+        }
+
+        .section {
+            margin-bottom: 50px;
+        }
+
+        h2 {
+            font-size: 18px;
+            border-bottom: 2px solid var(--amber-100);
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+            color: var(--slate-600);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .persona-box {
+            background: white;
+            padding: 30px;
+            border-radius: 25px;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(217, 119, 6, 0.05);
+            border-left: 5px solid var(--amber-400);
+        }
+
+        .interest-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag {
+            background: var(--amber-100);
+            color: var(--amber-600);
+            padding: 8px 18px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .meta {
+            font-size: 13px;
+            color: var(--slate-600);
+            text-align: center;
+            margin-top: 60px;
+            border-top: 1px solid var(--amber-100);
+            padding-top: 30px;
+        }
+
+        .amber-note {
+            font-size: 15px;
+            font-style: italic;
+            color: var(--slate-600);
+        }
+
+        .glow-dot {
+            width: 12px;
+            height: 12px;
+            background: var(--amber-400);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--amber-400);
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                border: none;
+                padding: 20px;
+            }
+
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">✨</div>
+            <h1>
+                <%= name %> 様
+            </h1>
+            <div class="subtitle">琥珀に刻まれた、生きた証</div>
+        </div>
+
+        <div class="section">
+            <h2><span class="glow-dot"></span> 趣味と情熱</h2>
+            <div class="interest-tags">
+                <% interest.split(/[,\s+、]/).filter(t=> t).forEach(function(tag) { %>
+                    <span class="tag">
+                        <%= tag %>
+                    </span>
+                    <% }); %>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="glow-dot"></span> 琥珀（Amber）による記録</h2>
+            <div class="persona-box">
+                <p class="amber-note">「<%= personaSummary %>」</p>
+                <p style="font-size: 13px; color: var(--amber-600); margin-top: 20px; text-align: right;">
+                    — 会員様との温かい対話より抽出
+                </p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="glow-dot"></span> 最後の活動記録</h2>
+            <p style="font-size: 20px; font-weight: bold; color: var(--slate-800);">
+                <%= last_seen_formatted %>
+            </p>
+        </div>
+
+        <div class="meta">
+            <p>このページは会員様との生前の「輝き」を保存するために生成されました。</p>
+            <p>発行：Amber Ink - 会員様の「生きた証」を大切に。 <%= generated_at %>
+            </p>
+            <p class="no-print" style="margin-top: 20px;">
+                <button onclick="window.print()"
+                    style="background: var(--amber-600); color: white; border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer; font-weight: bold;">
+                    PDFとして保存 / 印刷
+                </button>
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

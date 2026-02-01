@@ -3,6 +3,7 @@ import { AppHeader } from './components/AppHeader';
 import { RegistrationView } from './components/RegistrationView';
 import { DashboardView } from './components/DashboardView';
 import { CompanionChatView } from './components/CompanionChatView';
+import { EmergencyStatusView } from './components/EmergencyStatusView';
 import { LoadingScreen } from './components/LoadingScreen';
 import { delay } from './utils/helpers';
 
@@ -71,38 +72,58 @@ export default function App() {
 
   // 初回データ読込
   useEffect(() => {
-    // Check for uid in URL (Auto-login from email)
     const urlParams = new URLSearchParams(window.location.search);
     const uidFromUrl = urlParams.get('uid');
+    const viewMode = urlParams.get('view');
 
-    if (uidFromUrl && uidFromUrl !== userId) {
-      console.log('Detecting UID from URL:', uidFromUrl);
-      localStorage.setItem('amber_ink_userId', uidFromUrl);
-      setUserId(uidFromUrl);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      return; // Wait for next effect with updated userId
-    }
-
-    const fetchUserData = async () => {
-      if (!userId) return;
+    const fetchUserData = async (id, isEmergency = false) => {
+      if (!id) return;
       try {
-        const res = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${userId}`, {
+        const res = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${id}`, {
           headers: {
-            'Authorization': `Bearer ${userId}`
+            'Authorization': `Bearer ${id}`
           }
         });
         if (res.ok) {
           const data = await res.json();
           if (data && data.userId) {
             setUserData(data);
-            if (mode === 'registration') setMode('dashboard');
+            if (isEmergency) {
+              setMode('emergency');
+            } else {
+              if (mode === 'registration') setMode('dashboard');
+            }
           }
         }
-      } catch (e) { console.error("Fetch user error:", e); }
-      finally { setTimeout(() => setIsLoading(false), 800); }
+      } catch (e) {
+        console.error("Fetch user error:", e);
+      } finally {
+        setTimeout(() => setIsLoading(false), 800);
+      }
     };
-    fetchUserData();
+
+    if (viewMode === 'emergency' && uidFromUrl) {
+      console.log('Emergency View mode detected for UID:', uidFromUrl);
+      setUserId(uidFromUrl); // Set temporary userId for fetching
+      fetchUserData(uidFromUrl, true);
+      // CLEANUP: Do NOT save to localStorage for emergency view to isolate family from member session
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (uidFromUrl && uidFromUrl !== userId) {
+      console.log('Detecting UID from URL (Internal login):', uidFromUrl);
+      localStorage.setItem('amber_ink_userId', uidFromUrl);
+      setUserId(uidFromUrl);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (userId) {
+      fetchUserData(userId);
+    } else {
+      setIsLoading(false);
+    }
   }, [userId]);
 
   useEffect(() => {
@@ -236,7 +257,7 @@ export default function App() {
         `・お名前: ${userData.name}\n` +
         `・興味・関心: ${userData.interest}\n` +
         `・現在の連絡先: ${userData.contact} (${userData.contact_method})\n` +
-        `・緊急連絡先: ${userData.emergency_contact} (${userData.emergency_method})\n\n` +
+        `・見守りサポーター: ${userData.emergency_contact} (${userData.emergency_method})\n\n` +
         `内容に変更はありますか？（「名前を○○に変えて」などと伝えていただければ修正します）`;
 
       const suggestions = [
@@ -346,11 +367,11 @@ export default function App() {
 
     const introMsg = `テスト配信ですね。宛先はどちらにしますか？\n\n` +
       `・自分(${userData.contact_method})：${userData.contact}\n` +
-      `・緊急連絡先(${userData.emergency_method})：${userData.emergency_contact}`;
+      `・見守りサポーター(${userData.emergency_method})：${userData.emergency_contact}`;
 
     const suggestions = [
       { label: "自分宛にテスト", value: "自分宛に配信テストをお願いします" },
-      { label: "緊急連絡先宛にテスト", value: "緊急連絡先宛に配信テストをお願いします" }
+      { label: "サポーター宛にテスト", value: "見守りサポーター宛に配信テストをお願いします" }
     ];
 
     setCompanionMessages(prev => [...prev, { role: 'ai', text: introMsg, suggestions }]);
@@ -363,9 +384,14 @@ export default function App() {
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl" />
       <div className="absolute top-1/2 -left-20 w-48 h-48 bg-orange-400/20 rounded-full blur-3xl" />
 
-      <AppHeader mode={mode} regType={regType} setRegType={setRegType} setMode={setMode} />
+      {/* 隔離設計：緊急ビューではヘッダー（メニュー等）を表示しない */}
+      {mode !== 'emergency' && (
+        <AppHeader mode={mode} regType={regType} setRegType={setRegType} setMode={setMode} />
+      )}
 
-      {mode === 'registration' ? (
+      {mode === 'emergency' ? (
+        <EmergencyStatusView userId={userId} userData={userData} />
+      ) : mode === 'registration' ? (
         <RegistrationView
           regType={regType} chatMessages={chatMessages} isTyping={isTyping} chatEndRef={chatEndRef}
           inputValue={inputValue} setInputValue={setInputValue} handleSendMessage={handleSendMessage}

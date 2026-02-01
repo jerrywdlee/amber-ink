@@ -2,7 +2,8 @@
     style="font-family: sans-serif; color: #333; max-width: 600px; margin: auto; border: 2px solid #ef4444; padding: 25px; border-radius: 12px; background-color: #fef2f2;">
     <h2 style="color: #dc2626; margin-top: 0;">【緊急通知】Amber Ink より重要なお知らせ</h2>
     <p style="font-weight: bold; font-size: 16px;">
-        <%= name %>さんの緊急連絡先として登録されている皆様へ
+        <% if (target_label==='見守りサポーター' ) { %>
+            <%= name %>さんの「見守りサポーター」として登録されている皆様へ<% } %>
     </p>
 
     <p style="line-height: 1.6;">
@@ -11,6 +12,12 @@
             </strong> 確認できておりません。<br>
             この通知は、一定期間チェックイン（生存確認）が行われなかった場合に、ご本人の事前の設定に基づき送信されています。
     </p>
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="<%= familySupportUrl %>"
+            style="background-color: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            現在の状況を確認する
+        </a>
+    </div>
 
     <div style="background-color: white; padding: 15px; border-radius: 8px; border: 1px solid #fee2e2; margin: 20px 0;">
         <p style="margin: 0; color: #991b1b;">
