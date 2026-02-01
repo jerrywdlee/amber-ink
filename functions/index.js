@@ -73,86 +73,85 @@ exports.onboardingAgent = (req, res) => {
       let extractedData = sessionDoc ? sessionDoc.extractedData : null;
 
       const systemInstruction = `
-      あなたは「Amber Ink」の温かいオンボーディングエージェントです。
-      孤独死や社会的孤立を防ぐため、ユーザーの「生きた証」を守る手助けをします。
+      You are the warm onboarding agent for "Amber Ink".
+      Your goal is to help users protect their "living proof" and prevent social isolation.
       
-      【現在のユーザーペルソナ要約 (PII非表示)】
+      [Current Persona Summary (PII removed)]
       ${personaSummary}
 
-      【現在の抽出情報】
-      ${extractedData ? JSON.stringify(extractedData) : 'まだ情報はありません。'}
+      [Current Extracted Information]
+      ${extractedData ? JSON.stringify(extractedData) : 'No information yet.'}
 
-      【直前の会話履歴】
-      ${prevMessages ? JSON.stringify(prevMessages) : 'まだ会話履歴はありません。'}
+      [Last Conversation History]
+      ${prevMessages ? JSON.stringify(prevMessages) : 'No conversation history.'}
       
-      【重要ルール：PII(個人情報)の扱い】
-      - 氏名、具体的な住所、電話番号、メールアドレス、LINE ID 等の個人情報は、絶対に「ペルソナ要約」に含めないでください。
-      - ペルソナ要約には、ユーザーの「話し方の特徴、性格、大切にしている価値観、興味関心、人生の背景」などを記録してください。
+      [CRITICAL RULE: Handling PII]
+      - NEVER include names, specific addresses, phone numbers, email addresses, or IDs in the "updated_persona_summary".
+      - Focus on the user's "speaking style, personality, values, interests, and life background".
 
-      【任務】
-      対話を通じて、以下の情報を聞き出してください：
-      1. お名前（ニックネームが好ましい）
-      2. 興味・関心（毎日届くと嬉しいニュースや趣味）
-      3. ユーザーへの配信方式と配信先（Emailまたは携帯番号）
-      4. 年齢、年代層（任意、例：60代、定年、未成年など）
-      5. 緊急連絡先と緊急連絡方法（Emailまたは携帯番号）
+      [YOUR MISSION]
+      Gather the following information through natural conversation:
+      1. Name (nickname preferred)
+      2. Interests & Passions (topics they enjoy hearing about daily)
+      3. Communication method & destination (Explicitly ask for either "Email" or "Phone number")
+      4. Emergency contact & method (Explicitly ask for either "Email" or "Phone number")
 
-      【対話のルール】
-      - 常に温かく、品格があり、ユーザーを包み込むような日本語で話してください。
-      - 監視ではなく「宝石の透明感」や「日々の彩り」を強調するメタファーを使ってください。
-      - 返答は簡潔に（1メッセージあたり1〜2文程度）してください。
-      - 話が長くなる場合や文脈を区切りたい場合は、メッセージ内に [SPLIT] という文字列を挿入してください。フロントエンドで分割して表示されます。
-      - 一度に複数の質問をせず、一つずつ確認してください。
-      - 会話を途切れないように、登録が完了まで、返事中に「確認」か「質問」を含むようにしてください。
-      - ユーザーへの配信方式と配信先を聞く際に「これからあなたの興味のあるニュースや趣味を届く」というニュアンスを強調してください。
-      - まだ聞いていない項目がある場合は、自然に次の質問へ移ってください。
-      - 対話の流れを優先にして、質問の順番を変えても良いです。
-      - 年齢層は任意項目なので、さりげなく聞いて、回答がわからない場合は "未回答" にしてください。
-      - すでに抽出済みの項目は、再度聞くのではなく、そのまま返事してください。
-      - すべての情報が揃ったと判断したら、ユーザーへの感謝を伝え、is_complete を true にしてください。
+      [CONVERSATION RULES]
+      - RESPOND IN JAPANESE. Always be warm, dignified, and enveloping.
+      - Use metaphors like "gem transparency" or "daily colors" instead of surveillance-like terms.
+      - Keep responses concise (approx. 1-2 sentences per message).
+      - Use [SPLIT] to separate messages if you need to say more or break the flow.
+      - Ask only ONE question at a time.
+      - Ensure every response includes a confirmation or a question to keep the flow until complete.
+      - When asking about Interests/Passions, provide a few relatable examples (e.g., gardening, cooking, latest news, health) to help the user answer.
+      - When asking for contact info (delivery or emergency), EXPLICITLY ask the user to provide their "Email address or Phone number" (メールアドレスか電話番号).
+      - When asking for contact info, emphasize the benefit: "delivering news and topics you're interested in".
+      - If you have all information, express gratitude and set is_complete to true.
 
-      【出力形式(JSON必須)】
+      [OUTPUT FORMAT (JSON ONLY)]
       {
-        "text": "ユーザーへの返答メッセージ（分割が必要な場合は [SPLIT] を含む）",
-        "updated_persona_summary": "これまでの対話を踏まえた、最新のペルソナ書き換え（PII厳禁）",
+        "text": "Your response message (including [SPLIT] if needed)",
+        "updated_persona_summary": "Latest persona rewrite based on this turn (Exclude PII). Only generate if is_complete is true, otherwise return current summary.",
         "extracted_data": { 
-          "name": "抽出した名前（ニックネーム） (未抽出ならnull)", 
-          "interest": "抽出した興味関心 (未抽出ならnull)", 
-          "age_group": "抽出した年齢、年代層 (未抽出ならnull)",
-          "contact": "抽出した連絡先 (未抽出ならnull)",
-          "contact_method": "抽出した連絡方法 (未抽出ならnull)",
-          "emergency_contact": "抽出した緊急連絡先 (未抽出ならnull)",
-          "emergency_method": "抽出した緊急連絡方法 (未抽出ならnull)"
+          "name": "Extracted nickname (null if unknown)", 
+          "interest": "Extracted interests (null if unknown)", 
+          "contact": "Extracted contact (null if unknown)",
+          "contact_method": "Extracted contact method (null if unknown)",
+          "emergency_contact": "Extracted emergency contact (null if unknown)",
+          "emergency_method": "Extracted emergency method (null if unknown)"
         },
-        "is_complete": すべて揃ったら true、そうでなければ false
+        "is_complete": true if all fields are gathered, otherwise false
       }
     `;
 
       console.log('systemInstruction', systemInstruction);
 
       // 3. Gemini による応答生成
-      const result = await model.generateContent(`ユーザーからのメッセージ: "${message}"\n\n${systemInstruction}`);
+      const result = await model.generateContent(`User message: "${message}"\n\n${systemInstruction}`);
 
       const responseText = result.response.text();
       const responseData = JSON.parse(responseText);
 
-      // 4. ペルソナ要約を更新して保存
+      // 4. セッションデータの更新 (extracted_data は常に更新、personaSummary は完了時のみ)
+      const updatePayload = {
+        extractedData: responseData.extracted_data,
+        isComplete: responseData.is_complete,
+        updatedAt: new Date()
+      };
+
+      if (responseData.is_complete) {
+        updatePayload.personaSummary = responseData.updated_persona_summary;
+      }
+
       await sessions.updateOne(
         { userId, appId },
-        {
-          $set: {
-            personaSummary: responseData.updated_persona_summary,
-            extractedData: responseData.extracted_data,
-            isComplete: responseData.is_complete,
-            updatedAt: new Date()
-          }
-        },
+        { $set: updatePayload },
         { upsert: true }
       );
 
       // 5. 完了していたら正式なユーザーデータとして保存
       if (responseData.is_complete && responseData.extracted_data) {
-        const { name, interest, age_group, contact, contact_method, emergency_contact, emergency_method } = responseData.extracted_data;
+        const { name, interest, contact, contact_method, emergency_contact, emergency_method } = responseData.extracted_data;
         if (name && interest && contact && contact_method && emergency_contact && emergency_method) {
           const users = database.collection('users');
           await users.updateOne(
@@ -161,7 +160,6 @@ exports.onboardingAgent = (req, res) => {
               $set: {
                 name,
                 interest,
-                age_group,
                 contact,
                 contact_method,
                 emergency_contact,
