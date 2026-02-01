@@ -4,12 +4,12 @@ import { RegistrationView } from './components/RegistrationView';
 import { DashboardView } from './components/DashboardView';
 import { CompanionChatView } from './components/CompanionChatView';
 import { LoadingScreen } from './components/LoadingScreen';
+import { delay } from './utils/helpers';
 
 // --- Configuration ---
 const appId = import.meta.env.VITE_APP_ID || 'amber-ink';
 
-// --- Local Utils ---
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// --- Configuration ---
 
 const getOrCreateUserId = () => {
   let uid = localStorage.getItem('amber_ink_userId');
@@ -323,13 +323,11 @@ export default function App() {
 
       if (data.is_complete) {
         // AIによる登録完了時、画面を切り替えるために少し待機して再読込
-        setTimeout(() => {
-          setIsLoading(true);
-          setTimeout(() => {
-            setMode('dashboard');
-            setIsLoading(false);
-          }, 2000);
-        }, 3000);
+        await delay(3000);
+        setIsLoading(true);
+        await delay(2000);
+        setMode('dashboard');
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -374,6 +372,7 @@ export default function App() {
           companionMessages={companionMessages} isTypingCompanion={isTypingCompanion}
           companionChatEndRef={companionChatEndRef} isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen}
           clearCompanionHistory={clearCompanionHistory} handleSendCompanionMessage={handleSendCompanionMessage}
+          triggerDeliveryTest={triggerDeliveryTest}
           companionSuggestions={companionSuggestions} inputValue={inputValue} setInputValue={setInputValue}
         />
       ) : (

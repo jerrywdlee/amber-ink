@@ -40,15 +40,6 @@ export const DashboardView = ({
                     </div>
                     <span className="text-xs font-bold text-amber-900 uppercase">琥珀との語らい</span>
                 </GlassCard>
-                <GlassCard
-                    onClick={triggerDeliveryTest}
-                    className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform bg-amber-100/50 border-amber-200/50 cursor-pointer col-span-2"
-                >
-                    <div className="w-12 h-12 bg-amber-200 rounded-2xl flex items-center justify-center">
-                        <Send className="w-7 h-7 text-amber-700" />
-                    </div>
-                    <span className="text-xs font-bold text-amber-900 uppercase">配信テストを実行</span>
-                </GlassCard>
             </div>
 
             <div className="p-6 rounded-3xl border border-white/40 bg-white/20 backdrop-blur-sm italic text-amber-900/60 text-center text-xs font-medium">

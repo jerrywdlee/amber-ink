@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, Trash2, Plus, X } from 'lucide-react';
+import { Send, Trash2, Plus, X, User } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 
 export const CompanionChatView = ({
@@ -10,10 +10,16 @@ export const CompanionChatView = ({
     setIsMenuOpen,
     clearCompanionHistory,
     handleSendCompanionMessage,
+    triggerDeliveryTest,
     companionSuggestions,
     inputValue,
     setInputValue
 }) => {
+    // 画面遷移時にメニューが必ず閉じている状態にする
+    React.useEffect(() => {
+        setIsMenuOpen(false);
+    }, [setIsMenuOpen]);
+
     return (
         <div className="relative z-10 flex flex-col h-[78vh]">
             <div className="flex-1 overflow-y-auto space-y-4 pb-4 px-1 scrollbar-hide">
@@ -60,10 +66,18 @@ export const CompanionChatView = ({
                         履歴消去
                     </button>
                     <button
-                        onClick={() => handleSendCompanionMessage("自分のプロフィール（名前や興味関心）を確認したい")}
-                        className="px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform whitespace-nowrap"
+                        onClick={triggerDeliveryTest}
+                        className="px-3 py-1.5 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 rounded-full text-[10px] font-bold text-emerald-700 shadow-xs active:scale-95 transition-transform flex items-center gap-1 whitespace-nowrap"
                     >
-                        プロフィール確認
+                        <Send size={10} />
+                        テスト配信
+                    </button>
+                    <button
+                        onClick={() => handleSendCompanionMessage("自分のプロフィール（名前や興味関心）を確認したい")}
+                        className="px-3 py-1.5 bg-blue-500/10 backdrop-blur-md border border-blue-500/20 rounded-full text-[10px] font-bold text-blue-700 shadow-xs active:scale-95 transition-transform flex items-center gap-1 whitespace-nowrap"
+                    >
+                        <User size={10} />
+                        プロフィール
                     </button>
                 </div>
 
