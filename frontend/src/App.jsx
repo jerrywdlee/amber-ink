@@ -14,8 +14,8 @@ const getOrCreateUserId = () => {
   return userId;
 };
 
-const GlassCard = ({ children, className = "" }) => (
-  <div className={`backdrop-blur-xl bg-white/40 border border-white/30 shadow-xl rounded-[2.5rem] ${className}`}>
+const GlassCard = ({ children, className = "", ...props }) => (
+  <div className={`backdrop-blur-xl bg-white/40 border border-white/30 shadow-xl rounded-[2.5rem] ${className}`} {...props}>
     {children}
   </div>
 );
@@ -97,9 +97,9 @@ const StreakCalendar = ({ userData }) => {
       </div>
       <div className="grid grid-cols-7 gap-y-3 gap-x-0">
         {days.map((d, i) => {
-          const isChecked = checkins.includes(d);
+          const isChecked = checkins.some(c => c.startsWith(d));
           const isToday = d === todayStr;
-          const isInCurrentStreak = currentStreakDays.includes(d);
+          const isInCurrentStreak = currentStreakDays.some(c => c.startsWith(d));
           const isDifferentMonth = new Date(d).getMonth() !== startDate.getMonth();
 
           // 接続ロジック: 前後の日がチェックイン済みか (同じ週内かどうかも考慮するとより正確ですが、まずはシンプルに時系列で)
@@ -151,7 +151,7 @@ const StreakCalendar = ({ userData }) => {
 };
 
 export default function App() {
-  const [userId] = useState(getOrCreateUserId());
+  const [userId, setUserId] = useState(getOrCreateUserId());
   const [userData, setUserData] = useState(null);
   const [mode, setMode] = useState('registration'); // 'registration', 'dashboard'
   const [regType, setRegType] = useState('chat'); // 'chat' or 'form'
@@ -178,16 +178,68 @@ export default function App() {
 
   // 初回データ読込
   useEffect(() => {
+    // Check for uid in URL (Auto-login from email)
+    const urlParams = new URLSearchParams(window.location.search);
+    const uidFromUrl = urlParams.get('uid');
+
+    if (uidFromUrl && uidFromUrl !== userId) {
+      console.log('Detecting UID from URL:', uidFromUrl);
+      localStorage.setItem('amber_ink_userId', uidFromUrl);
+      setUserId(uidFromUrl);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return; // Wait for next effect with updated userId
+    }
+
     const fetchUserData = async () => {
+      if (!userId) return;
       try {
-        const response = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${userId}`, {
+        let response = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${userId}`, {
           headers: {
             'Authorization': `Bearer ${userId}`
           }
         });
         if (response.ok) {
-          const data = await response.json();
+          let data = await response.json();
           setUserData(data);
+
+          // Trigger Check-in before showing dashboard ONLY if not already checked in today
+          const todayStr = new Date().toISOString().split('T')[0];
+          const lastCheckin = localStorage.getItem(`amber_ink_last_checkin_${userId}`);
+
+          if (lastCheckin !== todayStr && !data.checkins.some(c => c.startsWith(todayStr))) {
+            try {
+              console.log("Triggering daily auto-checkin...");
+              await fetch(import.meta.env.VITE_CHECKIN_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${userId}`
+                },
+                body: JSON.stringify({ userId })
+              });
+              localStorage.setItem(`amber_ink_last_checkin_${userId}`, todayStr);
+              console.log("Auto-Checkin successful");
+
+              // Update user data
+              response = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${userId}`, {
+                headers: {
+                  'Authorization': `Bearer ${userId}`
+                }
+              });
+              data = await response.json();
+              setUserData(data);
+            } catch (checkinError) {
+              console.error("Auto-Checkin failed:", checkinError);
+            }
+          } else {
+            console.log("Already checked in today, skipping auto-checkin.");
+            // Sync local storage if the server already had today's checkin
+            if (data.checkins.some(c => c.startsWith(todayStr))) {
+              localStorage.setItem(`amber_ink_last_checkin_${userId}`, todayStr);
+            }
+          }
+
           setMode('dashboard');
         }
       } catch (error) {
@@ -212,7 +264,7 @@ export default function App() {
             setUserData(data);
           }
         } catch (e) { }
-      }, 5000);
+      }, 30 * 1000);
       return () => clearInterval(interval);
     }
   }, [mode, userId]);
@@ -301,6 +353,44 @@ export default function App() {
       console.error('Error sending message:', error);
       setIsTyping(false);
       setChatMessages(prev => [...prev, { role: 'ai', text: '申し訳ありません。接続に失敗しました。琥珀の輝きを取り戻すため、もう一度お試しいただけますか？' }]);
+    }
+  };
+
+  const triggerDeliveryTest = async () => {
+    console.log(import.meta.env.VITE_RUN_AI_ANALYZER_URL);
+    console.log(import.meta.env.VITE_RUN_DELIVERY_ENGINE_URL);
+    try {
+      setIsLoading(true);
+      // 1. Run AI Analyzer
+      let res = await fetch(import.meta.env.VITE_RUN_AI_ANALYZER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      let data = await res.json();
+      console.log('AI Analyzer result:', data);
+
+      // 2. Run Delivery Engine
+      res = await fetch(import.meta.env.VITE_RUN_DELIVERY_ENGINE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      data = await res.json();
+      console.log(data);
+      alert('配信テストを実行しました。メール（またはログ）を確認してください。');
+    } catch (e) {
+      alert('テスト実行中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -435,6 +525,15 @@ export default function App() {
                 <User className="w-7 h-7 text-amber-600" />
               </div>
               <span className="text-xs font-bold text-amber-900 uppercase">アカウント</span>
+            </GlassCard>
+            <GlassCard
+              onClick={triggerDeliveryTest}
+              className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform bg-amber-100/50 border-amber-200/50 cursor-pointer col-span-2"
+            >
+              <div className="w-12 h-12 bg-amber-200 rounded-2xl flex items-center justify-center">
+                <Send className="w-7 h-7 text-amber-700" />
+              </div>
+              <span className="text-xs font-bold text-amber-900 uppercase">配信テストを実行</span>
             </GlassCard>
           </div>
 

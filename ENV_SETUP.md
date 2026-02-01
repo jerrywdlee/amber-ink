@@ -19,13 +19,19 @@ PORT=8080
 ```
 
 ## 2. Frontend (.env)
-フロントエンドの `frontend/` ディレクトリに設置します。
+フロントエンドの `frontend/` ディレクトリに設置します。デモ環境では、Docker Compose で起動した各機能のポートに合わせます。
 
 ```bash
-# Cloud Functions のエンドポイント (ローカル起動時)
-VITE_CLOUD_FUNCTION_URL=http://localhost:8080/onboardingAgent
+# 各機能のエンドポイント (Local Docker Compose)
+VITE_CLOUD_FUNCTION_URL=http://localhost:8081
+VITE_REGISTER_USER_URL=http://localhost:8082
+VITE_CHECKIN_URL=http://localhost:8083
+VITE_GET_USER_DATA_URL=http://localhost:8085
 
-# その他の設定
+# Manual Delivery Triggers (プレゼン・テスト用)
+VITE_RUN_AI_ANALYZER_URL=http://localhost:8086
+VITE_RUN_DELIVERY_ENGINE_URL=http://localhost:8087
+
 VITE_APP_ID=amber-ink
 ```
 
