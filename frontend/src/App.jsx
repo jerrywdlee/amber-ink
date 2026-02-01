@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Send, Calendar as CalendarIcon, ShieldCheck, User, MessageCircle, Award, Settings, Zap, Info, Gem } from 'lucide-react';
+import { Heart, Send, Calendar as CalendarIcon, ShieldCheck, User, MessageCircle, Award, Settings, Zap, Info, Gem, Trash2, ChevronLeft, Plus, X } from 'lucide-react';
 
 // --- Configuration ---
 const appId = import.meta.env.VITE_APP_ID || 'amber-ink';
@@ -173,6 +173,8 @@ export default function App() {
     return [];
   });
   const [isTypingCompanion, setIsTypingCompanion] = useState(false);
+  const [companionSuggestions, setCompanionSuggestions] = useState([]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     // 5 turn (10 messages) limit
@@ -182,6 +184,13 @@ export default function App() {
   useEffect(() => {
     if (userId) {
       localStorage.setItem(`amber_ink_companion_history_${userId}`, JSON.stringify(companionMessages));
+    }
+    // Sync suggestions from the latest AI message
+    const lastMsg = companionMessages[companionMessages.length - 1];
+    if (lastMsg && lastMsg.role === 'ai' && lastMsg.suggestions) {
+      setCompanionSuggestions(lastMsg.suggestions);
+    } else if (lastMsg && lastMsg.role === 'user') {
+      setCompanionSuggestions([]);
     }
   }, [companionMessages, userId]);
 
@@ -288,8 +297,15 @@ export default function App() {
   }, [chatMessages, isTyping]);
 
   useEffect(() => {
-    companionChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [companionMessages, isTypingCompanion]);
+    const scrollToBottom = () => {
+      companionChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+    if (mode === 'companion') {
+      // Small delay ensures content is rendered before scrolling
+      const timer = setTimeout(scrollToBottom, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [mode, companionMessages, isTypingCompanion]);
 
   const saveUserData = async (data) => {
     try {
@@ -326,64 +342,107 @@ export default function App() {
     }
   };
 
-  const startCompanionChat = async () => {
-    setMode('companion');
-    if (companionMessages.length === 0) {
-      setIsTypingCompanion(true);
+  const initiateCompanionGreeting = async () => {
+    setIsTypingCompanion(true);
+    setCompanionSuggestions([]);
 
-      const hour = new Date().getHours();
-      let greeting = "こんにちは。";
-      if (hour >= 5 && hour < 11) greeting = "おはよう。今日も話かけてくれて、とても嬉しいです。";
-      else if (hour >= 18 || hour < 5) greeting = "こんばんは。今日も一日お疲れ様。夜はゆっくり心身を休めてくださいね。";
-      else greeting = "こんにちは。少し一息つかない？あなたのこと、もっと聞かせて。";
+    const hour = new Date().getHours();
+    let greeting = "こんにちは。";
+    if (hour >= 5 && hour < 11) greeting = "おはよう。今日も話かけてくれて、とても嬉しいです。";
+    else if (hour >= 18 || hour < 5) greeting = "こんばんは。今日も一日お疲れ様。夜はゆっくり心身を休めてくださいね。";
+    else greeting = "こんにちは。少し一息つかない？あなたのこと、もっと聞かせて。";
 
-      // 1. Start fetching AI proactive comment in parallel
-      const aiPromise = fetch(import.meta.env.VITE_COMPANION_AGENT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`
-        },
-        body: JSON.stringify({ userId, isInitial: true })
-      }).then(r => r.json()).catch(e => {
-        console.error("Companion AI error:", e);
-        return null;
-      });
+    // 1. Start fetching AI proactive comment in parallel
+    const aiPromise = fetch(import.meta.env.VITE_COMPANION_AGENT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userId}`
+      },
+      body: JSON.stringify({ userId, isInitial: true })
+    }).then(r => r.json()).catch(e => {
+      console.error("Companion AI error:", e);
+      return null;
+    });
 
-      // 2. Immediate greeting animation
-      await delay(1200);
-      setCompanionMessages([{ role: 'ai', text: greeting }]);
-      setIsTypingCompanion(false);
+    // 2. Immediate greeting animation
+    await delay(1200);
+    setCompanionMessages([{ role: 'ai', text: greeting }]);
+    setIsTypingCompanion(false);
 
-      // 3. Wait for AI response
-      setIsTypingCompanion(true);
-      const data = await aiPromise;
+    // 3. Wait for AI response
+    setIsTypingCompanion(true);
+    const data = await aiPromise;
 
-      if (data && data.text) {
-        const messages = data.text.split('[SPLIT]').filter(t => t.trim());
-        let currentMessages = [{ role: 'ai', text: greeting }];
+    if (data && data.text) {
+      const messages = data.text.split('[SPLIT]').filter(t => t.trim());
+      let currentMessages = [{ role: 'ai', text: greeting }];
 
-        for (const msg of messages) {
-          setIsTypingCompanion(true);
-          const waitTime = Math.max(1500, msg.length * 50);
-          await delay(waitTime);
-          currentMessages = [...currentMessages, { role: 'ai', text: msg.trim() }];
-          setCompanionMessages(currentMessages);
-          setIsTypingCompanion(false);
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        setIsTypingCompanion(true);
+        const waitTime = Math.max(1500, msg.length * 50);
+        await delay(waitTime);
+
+        const msgObj = { role: 'ai', text: msg.trim() };
+        if (i === messages.length - 1) {
+          msgObj.suggestions = data.suggestions || [];
         }
-      } else {
+        currentMessages = [...currentMessages, msgObj];
+        setCompanionMessages(currentMessages);
         setIsTypingCompanion(false);
       }
+    } else {
+      setIsTypingCompanion(false);
     }
   };
 
-  const handleSendCompanionMessage = async () => {
-    if (!inputValue.trim() || isTypingCompanion) return;
-    const userMsg = inputValue.trim();
-    setInputValue('');
+  const clearCompanionHistory = async () => {
+    if (window.confirm('これまでの琥珀との会話履歴を消去しますか？（この操作は取り消せません）')) {
+      setCompanionMessages([]);
+      setCompanionSuggestions([]);
+      setIsMenuOpen(false);
+      localStorage.removeItem(`amber_ink_companion_history_${userId}`);
+      // 履歴消去後、再び挨拶を実行
+      await initiateCompanionGreeting();
+    }
+  };
+
+  const startCompanionChat = async () => {
+    setMode('companion');
+    if (companionMessages.length === 0) {
+      await initiateCompanionGreeting();
+    }
+  };
+
+  const handleSendCompanionMessage = async (overrideMsg = null) => {
+    if (!overrideMsg && (!inputValue.trim() || isTypingCompanion)) return;
+    const userMsg = overrideMsg || inputValue.trim();
+    if (!overrideMsg) setInputValue('');
+
     const newMessages = [...companionMessages, { role: 'user', text: userMsg }];
     setCompanionMessages(newMessages);
     setIsTypingCompanion(true);
+
+    // 特殊対応: プロフィール確認をローカルで処理 (LLMを通さず機械的に出力)
+    if (userMsg === "自分のプロフィール（名前や興味関心）を確認したい") {
+      await delay(1000);
+      const profileText = `現在の登録内容は以下の通りです：\n\n` +
+        `・お名前: ${userData.name}\n` +
+        `・興味・関心: ${userData.interest}\n` +
+        `・現在の連絡先: ${userData.contact} (${userData.contact_method})\n` +
+        `・緊急連絡先: ${userData.emergency_contact} (${userData.emergency_method})\n\n` +
+        `内容に変更はありますか？（「名前を○○に変えて」などと伝えていただければ修正します）`;
+
+      const suggestions = [
+        { label: "変更なし", value: "特に変更はありません。ありがとう。" },
+        { label: "変更したい", value: "内容を少し修正してほしいな" }
+      ];
+      const finalMessages = [...newMessages, { role: 'ai', text: profileText, suggestions }];
+      setCompanionMessages(finalMessages);
+      setIsTypingCompanion(false);
+      return;
+    }
 
     try {
       const response = await fetch(import.meta.env.VITE_COMPANION_AGENT_URL, {
@@ -395,15 +454,27 @@ export default function App() {
         body: JSON.stringify({ userId, message: userMsg })
       });
       const data = await response.json();
+
+      // プロフィールが更新された場合はローカルデータも同期
+      if (data.updated_profile && Object.keys(data.updated_profile).length > 0) {
+        setUserData(prev => ({ ...prev, ...data.updated_profile }));
+      }
+
       if (data.text) {
         const messages = data.text.split('[SPLIT]').filter(t => t.trim());
         let currentMessages = [...newMessages];
 
-        for (const msg of messages) {
+        for (let i = 0; i < messages.length; i++) {
+          const msg = messages[i];
           setIsTypingCompanion(true);
           const waitTime = Math.max(1500, msg.length * 50);
           await delay(waitTime);
-          currentMessages = [...currentMessages, { role: 'ai', text: msg.trim() }];
+
+          const msgObj = { role: 'ai', text: msg.trim() };
+          if (i === messages.length - 1) {
+            msgObj.suggestions = data.suggestions || [];
+          }
+          currentMessages = [...currentMessages, msgObj];
           setCompanionMessages(currentMessages);
           setIsTypingCompanion(false);
         }
@@ -507,7 +578,7 @@ export default function App() {
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl" />
       <div className="absolute top-1/2 -left-20 w-48 h-48 bg-orange-400/20 rounded-full blur-3xl" />
 
-      <header className="flex items-center justify-between mb-8 pt-4 relative z-10">
+      <header className="flex items-center justify-between mb-8 pt-4 relative z-10 px-1">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
             <Heart className="w-6 h-6 fill-current" />
@@ -517,22 +588,25 @@ export default function App() {
             <p className="text-[10px] text-amber-700/70 font-medium uppercase tracking-widest mt-1">Preserving Life's Glow</p>
           </div>
         </div>
-        {mode === 'registration' && (
-          <button
-            onClick={() => setRegType(regType === 'chat' ? 'form' : 'chat')}
-            className="p-2 bg-white/50 backdrop-blur-md rounded-full border border-white/50 text-amber-700 shadow-sm"
-          >
-            {regType === 'chat' ? <Zap className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
-          </button>
-        )}
-        {mode === 'companion' && (
-          <button
-            onClick={() => setMode('dashboard')}
-            className="px-4 py-2 bg-white/50 backdrop-blur-md rounded-full border border-white/50 text-amber-700 shadow-sm text-xs font-bold"
-          >
-            戻る
-          </button>
-        )}
+
+        <div className="flex items-center gap-2">
+          {mode === 'registration' && (
+            <button
+              onClick={() => setRegType(regType === 'chat' ? 'form' : 'chat')}
+              className="p-2 bg-white/50 backdrop-blur-md rounded-full border border-white/50 text-amber-700 shadow-sm"
+            >
+              {regType === 'chat' ? <Zap className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
+            </button>
+          )}
+          {mode === 'companion' && (
+            <button
+              onClick={() => setMode('dashboard')}
+              className="p-2 bg-white/50 backdrop-blur-md rounded-full border border-white/50 text-amber-700 shadow-sm active:scale-95 transition-transform"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </header>
 
       {mode === 'registration' ? (
@@ -636,6 +710,49 @@ export default function App() {
             )}
             <div ref={companionChatEndRef} />
           </div>
+
+          {/* Quick Suggestions */}
+          <div className="flex flex-wrap items-center gap-2 mt-2 mb-1 px-1">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 ${isMenuOpen ? 'bg-amber-100 text-amber-900 border-amber-200' : 'bg-amber-500 text-white shadow-md shadow-amber-500/20 rotate-0'} border active:scale-90`}
+            >
+              {isMenuOpen ? <X size={16} /> : <Plus size={18} />}
+            </button>
+
+            <div className={`flex items-center gap-2 overflow-hidden transition-all duration-500 ease-in-out ${isMenuOpen ? 'max-w-xs opacity-100 translate-x-0' : 'max-w-0 opacity-0 -translate-x-4 pointer-events-none'}`}>
+              <button
+                onClick={clearCompanionHistory}
+                className="px-3 py-1.5 bg-red-500/10 backdrop-blur-md border border-red-500/20 rounded-full text-[10px] font-bold text-red-700 shadow-xs active:scale-95 transition-transform flex items-center gap-1 whitespace-nowrap"
+              >
+                <Trash2 size={10} />
+                履歴消去
+              </button>
+              <button
+                onClick={() => handleSendCompanionMessage("自分のプロフィール（名前や興味関心）を確認したい")}
+                className="px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform whitespace-nowrap"
+              >
+                プロフィール確認
+              </button>
+            </div>
+
+            <button
+              onClick={() => handleSendCompanionMessage("前回届いた配信の内容を教えて")}
+              className="px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform"
+            >
+              前回の配信
+            </button>
+            {companionSuggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => handleSendCompanionMessage(s.value || s)}
+                className="px-3 py-1.5 bg-amber-500/10 backdrop-blur-md border border-amber-500/20 rounded-full text-[10px] font-bold text-amber-700 shadow-xs active:scale-95 transition-transform"
+              >
+                {s.label || s}
+              </button>
+            ))}
+          </div>
+
           <GlassCard className="p-2 rounded-full flex items-center mt-4 border-amber-200/50 shadow-amber-500/10">
             <input
               className="flex-1 bg-transparent px-5 py-3 outline-none text-amber-900 placeholder-amber-700/50 font-medium"

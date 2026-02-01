@@ -14,6 +14,11 @@ const dbName = process.env.MONGODB_DB_NAME || 'amber_ink';
 const appId = process.env.APP_ID || 'amber-ink';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// --- Local Utils ---
+const cleanJson = (text) => {
+  return text.replace(/```json\n?|```/g, '').trim();
+};
+
 let client;
 let db;
 
@@ -131,7 +136,7 @@ exports.onboardingAgent = (req, res) => {
       const result = await model.generateContent(`User message: "${message}"\n\n${systemInstruction}`);
 
       const responseText = result.response.text();
-      const responseData = JSON.parse(responseText);
+      const responseData = JSON.parse(cleanJson(responseText));
 
       // 4. セッションデータの更新 (extracted_data は常に更新、personaSummary は完了時のみ)
       const updatePayload = {
@@ -238,7 +243,8 @@ exports.companionAgent = (req, res) => {
       let personaSummary = sessionDoc ? sessionDoc.personaSummary : '親しい友人。';
 
       const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        generationConfig: { responseMimeType: "application/json" }
       });
 
       const systemInstruction = `
@@ -271,12 +277,64 @@ exports.companionAgent = (req, res) => {
         - 簡潔に、1-2文程度で答えてください。
         - 感情が昂ぶったり話題を切り替える際は [SPLIT] を使って文を分けてください。
         - 敬語ですが、事務的ではなく、家族や親友のような親密さを込めてください。
+
+        [プロフィール・ペルソナ更新]
+        - 会話の中で、ユーザーが自分の情報（名前、興味関心、連絡先、緊急連絡先など）を変更したいと言及した場合、その情報を抽出してください。
+        - 会話を通じてユーザーへの理解が深まった場合、これまでの「ペルソナ要約」をより正確で温かみのある内容に更新してください。
+        - 変更した項目のみを抽出し、それ以外は null または空のオブジェクトを返してください。
+
+        [出力形式 (JSONのみ)]
+        {
+          "text": "返答メッセージ（[SPLIT]を含む可能性あり）",
+          "suggestions": [
+            { "label": "短いボタン名", "value": "ボタンを押した時に実際に送信される文章" }
+          ],
+          "updated_profile": {
+            "name": "変更後の名前",
+            "interest": "変更後の興味関心",
+            "contact": "変更後の連絡先",
+            "contact_method": "変更後の連絡方法",
+            "emergency_contact": "変更後の緊急連絡先",
+            "emergency_method": "変更後の緊急連絡方法"
+          },
+          "updated_persona_summary": "更新されたペルソナ要約（変更がある場合のみ）"
+        }
       `;
 
       const result = await model.generateContent(`${systemInstruction}\n\nUser: ${message || '(Initial greeting)'}`);
-      const responseText = result.response.text();
+      const responseData = JSON.parse(cleanJson(result.response.text()));
 
-      res.status(200).json({ text: responseText });
+      // プロフィール更新がある場合は DB に反映
+      if (responseData.updated_profile && Object.keys(responseData.updated_profile).length > 0) {
+        const updateData = {};
+        const fields = ['name', 'interest', 'contact', 'contact_method', 'emergency_contact', 'emergency_method'];
+        fields.forEach(f => {
+          if (responseData.updated_profile[f]) updateData[f] = responseData.updated_profile[f];
+        });
+
+        if (Object.keys(updateData).length > 0) {
+          updateData.updatedAt = new Date();
+          await users.updateOne({ userId, appId }, { $set: updateData });
+          console.log(`Profile updated for user ${userId}:`, updateData);
+        }
+      }
+
+      // ペルソナ要約の更新
+      if (responseData.updated_persona_summary) {
+        await sessions.updateOne(
+          { userId, appId },
+          {
+            $set: {
+              personaSummary: responseData.updated_persona_summary,
+              updatedAt: new Date()
+            }
+          },
+          { upsert: true }
+        );
+        console.log(`Persona summary updated for user ${userId}`);
+      }
+
+      res.status(200).json(responseData);
     } catch (error) {
       console.error('Companion Agent Error:', error);
       res.status(500).json({ error: error.message });
