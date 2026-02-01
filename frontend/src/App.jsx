@@ -45,13 +45,15 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
-    // 5 turn (10 messages) limit
-    const lastTurns = chatMessages.slice(-10);
+    // 16 turn (32 messages) limit
+    const lastTurns = chatMessages.slice(-32);
     localStorage.setItem('amber_ink_chat_history', JSON.stringify(lastTurns));
   }, [chatMessages]);
   useEffect(() => {
     if (userId) {
-      localStorage.setItem(`amber_ink_companion_history_${userId}`, JSON.stringify(companionMessages));
+      // 16 turn (32 messages) limit for storage
+      const lastTurns = companionMessages.slice(-32);
+      localStorage.setItem(`amber_ink_companion_history_${userId}`, JSON.stringify(lastTurns));
     }
     // Sync suggestions from the latest AI message
     const lastMsg = companionMessages[companionMessages.length - 1];
@@ -165,7 +167,7 @@ export default function App() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${userId}`
       },
-      body: JSON.stringify({ userId, isInitial: true })
+      body: JSON.stringify({ userId, isInitial: true, prevMessages: [] })
     }).then(r => r.json()).catch(e => null);
 
     // 2. Immediate greeting animation
@@ -254,7 +256,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userId}`
         },
-        body: JSON.stringify({ userId, message: userMsg })
+        body: JSON.stringify({ userId, message: userMsg, prevMessages: companionMessages.slice(-16) })
       });
       const data = await res.json();
 
@@ -305,7 +307,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userId}`
         },
-        body: JSON.stringify({ userId: userId, message: userMsg, prevMessages: chatMessages.slice(-20) })
+        body: JSON.stringify({ userId: userId, message: userMsg, prevMessages: chatMessages.slice(-16) })
       });
       const data = await res.json();
 
@@ -337,20 +339,22 @@ export default function App() {
   };
 
   const triggerDeliveryTest = async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_CLOUD_FUNCTION_URL}/triggerDelivery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userId}` },
-        body: JSON.stringify({ userId })
-      });
-      const data = await res.json();
-      alert('配信テストを実行しました。メール（またはログ）を確認してください。');
-    } catch (e) {
-      alert('テスト実行中にエラーが発生しました');
-    } finally {
-      setIsLoading(false);
-    }
+    setMode('companion');
+    setIsMenuOpen(false);
+    setIsTypingCompanion(true);
+    await delay(800);
+
+    const introMsg = `テスト配信ですね。宛先はどちらにしますか？\n\n` +
+      `・自分(${userData.contact_method})：${userData.contact}\n` +
+      `・緊急連絡先(${userData.emergency_method})：${userData.emergency_contact}`;
+
+    const suggestions = [
+      { label: "自分宛にテスト", value: "自分宛に配信テストをお願いします" },
+      { label: "緊急連絡先宛にテスト", value: "緊急連絡先宛に配信テストをお願いします" }
+    ];
+
+    setCompanionMessages(prev => [...prev, { role: 'ai', text: introMsg, suggestions }]);
+    setIsTypingCompanion(false);
   };
 
   return (

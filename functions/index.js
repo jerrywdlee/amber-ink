@@ -89,7 +89,7 @@ exports.onboardingAgent = (req, res) => {
       ${extractedData ? JSON.stringify(extractedData) : 'No information yet.'}
 
       [Last Conversation History]
-      ${prevMessages ? JSON.stringify(prevMessages) : 'No conversation history.'}
+      ${prevMessages ? JSON.stringify(prevMessages.slice(-16)) : 'No conversation history.'}
       
       [CRITICAL RULE: Handling PII]
       - NEVER include names, specific addresses, phone numbers, email addresses, or IDs in the "updated_persona_summary".
@@ -197,7 +197,7 @@ exports.onboardingAgent = (req, res) => {
  */
 exports.companionAgent = (req, res) => {
   cors(req, res, async () => {
-    const { userId, message, isInitial } = req.body;
+    const { userId, message, isInitial, prevMessages } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
@@ -265,6 +265,9 @@ exports.companionAgent = (req, res) => {
         [今日の配信予定・実績]
         ${user.scheduled_delivery ? user.scheduled_delivery.content_text : '本日はまだメッセージを配信していません。'}
 
+        [これまでの会話履歴]
+        ${prevMessages ? JSON.stringify(prevMessages.slice(-16)) : '履歴はありません。'}
+
         [琥珀へのガイドライン]
         - あなたはユーザーの生活リズム（チェックイン時刻）を「背景知識」として知っています。
         - 監視されていると感じさせないよう、直接的な指摘（「○時にチェックインしましたね」など）は避け、さりげない気遣いや共感に留めてください。
@@ -277,6 +280,14 @@ exports.companionAgent = (req, res) => {
         - 簡潔に、1-2文程度で答えてください。
         - 感情が昂ぶったり話題を切り替える際は [SPLIT] を使って文を分けてください。
         - 敬語ですが、事務的ではなく、家族や親友のような親密さを込めてください。
+
+        [テスト配信（テストデリバリー）フロー]
+        ユーザーがテスト配信（デマ配信テスト、生存確認テストなど）を希望している、またはそれに関連する対話を行っている場合、以下のステップを温かく、かつ正確に進めてください。
+        1. 宛先の提示と選択: ユーザーに「自分宛」か「緊急連絡先宛」かを確認してください。その際、現在登録されている情報を正確に提示してください：
+           - 自分(${user.contact_method}): ${user.contact}
+           - 緊急連絡先(${user.emergency_method}): ${user.emergency_contact}
+        2. 内容の復唱と最終確認: ユーザーが宛先を選択したら、「[自分宛/緊急連絡先]の[実際の連絡先]へ、配信テストを行ってもよろしいですか？」と復唱して最終確認を取ってください。
+        3. 実行の合図: ユーザーが「はい」や「お願いします」など、明確に実行を承諾する返答をしたら、JSONの "test_delivery_trigger" フィールドに "self" または "emergency" をセットしてください。それ以外のステップでは null にしてください。
 
         [プロフィール・ペルソナ更新]
         - 会話の中で、ユーザーが自分の情報（名前、興味関心、連絡先、緊急連絡先など）を変更したいと言及した場合、その情報を抽出してください。
@@ -297,7 +308,8 @@ exports.companionAgent = (req, res) => {
             "emergency_contact": "変更後の緊急連絡先",
             "emergency_method": "変更後の緊急連絡方法"
           },
-          "updated_persona_summary": "更新されたペルソナ要約（変更がある場合のみ）"
+          "updated_persona_summary": "更新されたペルソナ要約（変更がある場合のみ）",
+          "test_delivery_trigger": "self" | "emergency" | null
         }
       `;
 
@@ -334,6 +346,17 @@ exports.companionAgent = (req, res) => {
         console.log(`Persona summary updated for user ${userId}`);
       }
 
+      // テスト配信トリガーの処理
+      if (responseData.test_delivery_trigger) {
+        console.log(`Executing test delivery for ${userId} to ${responseData.test_delivery_trigger}`);
+        try {
+          // 非同期で実行（レスポンスを待たずに完了とするか、待つかは要件次第だが、ここでは実行を待機してログを確実にする）
+          await exports.deliveryEngine(userId, responseData.test_delivery_trigger);
+        } catch (e) {
+          console.error('Manual test delivery trigger failed:', e);
+        }
+      }
+
       res.status(200).json(responseData);
     } catch (error) {
       console.error('Companion Agent Error:', error);
@@ -342,45 +365,45 @@ exports.companionAgent = (req, res) => {
   });
 };
 
-exports.deliveryEngine = async (targetUserId) => {
+exports.deliveryEngine = async (targetUserId, targetOverride) => {
   try {
     const now = new Date();
     const database = await connectToDb();
 
-    const query = {
-      status: 'active',
-      'scheduled_delivery.at': { $lte: now },
-      'scheduled_delivery.sent': { $ne: true }
-    };
+    const query = { status: 'active' };
 
-    if (targetUserId) {
-      query.userId = targetUserId;
+    if (targetOverride) {
+      // テスト配信の場合：スケジュール時刻や送信済みフラグを無視
+      if (targetUserId) query.userId = targetUserId;
+    } else {
+      // 定期配信の場合：時刻が来ており、未送信のもの
+      query['scheduled_delivery.at'] = { $lte: now };
+      query['scheduled_delivery.sent'] = { $ne: true };
+      if (targetUserId) query.userId = targetUserId;
     }
 
     const users = await database.collection('users').find(query).toArray();
 
     if (users.length === 0) return { success: true, sent: 0 };
 
-    console.log(`Delivery Engine: Found ${users.length} pending deliveries.`);
+    console.log(`Delivery Engine: Found ${users.length} targets (Mode: ${targetOverride ? 'Test' : 'Scheduled'}).`);
 
     const baseUrl = process.env.BASE_FUNCTION_URL || 'http://localhost:8080';
 
     for (const user of users) {
-      const checkInUrl = `${baseUrl}/checkIn?uid=${user.userId}`;
-      const deliveryData = {
-        content_html: user.scheduled_delivery.content_html,
-        content_text: user.scheduled_delivery.content_text,
-        checkInUrl: checkInUrl
-      };
-
       try {
-        await deliveryService.send(user, deliveryData);
+        await deliveryService.send(user, { targetOverride, type: 'daily' });
 
-        await database.collection('users').updateOne(
-          { _id: user._id },
-          { $set: { 'scheduled_delivery.sent': true, last_emailed_at: new Date() } }
-        );
-        console.log(`Delivery completed for ${user.name}`);
+        if (!targetOverride) {
+          // 定期配信の場合のみ記録を残す
+          await database.collection('users').updateOne(
+            { _id: user._id },
+            { $set: { 'scheduled_delivery.sent': true, last_emailed_at: new Date() } }
+          );
+          console.log(`Delivery completed for ${user.name}`);
+        } else {
+          console.log(`Test delivery (Override: ${targetOverride}) completed for ${user.name} (No records kept)`);
+        }
       } catch (err) {
         console.error(`Failed delivery for ${user.name}:`, err);
       }
@@ -416,18 +439,26 @@ exports.aiAnalyzer = async (targetUserId) => {
     for (const user of users) {
       const prompt = `
       You are the "Amber Ink" AI Content Architect.
-      Create a personalized greeting and news snippet for ${user.name} based on their interest: "${user.interest}".
+      Create a personalized greeting and short news snippets for ${user.name} based on their interests: "${user.interest}".
+      
+      [Guidelines for Multi-Interest Users]
+      - Split the user's interests by commas or context.
+      - For EACH interest, create one separate "snippet".
+      - Snippets should be short (1-2 sentences) and include a brief interesting fact or warm thought related to that specific hobby.
+      - Do NOT mix different hobbies in a single snippet.
+      
       Use their persona summary for tone: "${user.personaSummary || 'Friendly and calm'}".
 
       [Goal]
-      1. Provide a warm, brief morning greeting.
-      2. Share a small interesting fact or fake news snippet related to their interest that makes them feel connected to the world.
-      3. Encourage them to "check-in" to preserve their glow.
+      1. Provide warm snippets that make them feel connected to their passions.
+      2. Encourage them to "check-in" to preserve their glow (Note: the check-in button is handled by the template).
 
       [Output Format (JSON only)]
       {
-        "content_html": "HTML formatted message. Use <p> tags. Keep it under 200 words. Include a greeting and the news.",
-        "content_text": "Plain text version.",
+        "snippets": [
+          { "topic": "Gardening", "text": "Something warm about plants..." },
+          { "topic": "Cooking", "text": "A small tip about seasonal ingredients..." }
+        ],
         "scheduled_at": "ISO string for tomorrow morning around 8 AM"
       }
       
@@ -436,15 +467,14 @@ exports.aiAnalyzer = async (targetUserId) => {
       `;
 
       const result = await model.generateContent(prompt);
-      const data = JSON.parse(result.response.text());
+      const data = JSON.parse(cleanJson(result.response.text()));
 
       await database.collection('users').updateOne(
         { _id: user._id },
         {
           $set: {
             scheduled_delivery: {
-              content_html: data.content_html,
-              content_text: data.content_text,
+              snippets: data.snippets,
               at: new Date(data.scheduled_at),
               sent: false
             },
@@ -484,6 +514,44 @@ exports.getUserData = (req, res) => {
       res.status(500).json({ error: error.message });
     }
   });
+};
+
+/**
+ * 4.5. emergencyMonitor: 放置ユーザーの緊急検知
+ */
+exports.emergencyMonitor = async () => {
+  try {
+    const database = await connectToDb();
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+    // 3日以上 last_seen が更新されておらず、かつステータスが active のユーザー
+    const users = await database.collection('users').find({
+      status: 'active',
+      last_seen: { $lt: threeDaysAgo.toISOString() },
+      emergency_notified: { $ne: true } // 一度通知したら重複しないようにする
+    }).toArray();
+
+    console.log(`Emergency Monitor: Found ${users.length} inactive users.`);
+
+    for (const user of users) {
+      try {
+        await deliveryService.send(user, { type: 'emergency' });
+
+        await database.collection('users').updateOne(
+          { _id: user._id },
+          { $set: { emergency_notified: true, last_emergency_at: new Date() } }
+        );
+        console.log(`Emergency alert sent for ${user.name}`);
+      } catch (err) {
+        console.error(`Failed emergency alert for ${user.name}:`, err);
+      }
+    }
+    return { success: true, notified: users.length };
+  } catch (error) {
+    console.error('Emergency Monitor Error:', error);
+    throw error;
+  }
 };
 
 /**
@@ -553,7 +621,8 @@ exports.checkIn = (req, res) => {
         { userId, appId },
         {
           $set: { last_seen: new Date().toISOString(), updatedAt: new Date() },
-          $addToSet: { checkins: today }
+          $addToSet: { checkins: today },
+          $unset: { emergency_notified: "" }
         }
       );
 
@@ -595,8 +664,8 @@ exports.runAiAnalyzer = (req, res) => {
 exports.runDeliveryEngine = (req, res) => {
   cors(req, res, async () => {
     try {
-      const { userId } = req.body;
-      const result = await exports.deliveryEngine(userId);
+      const { userId, targetOverride } = req.body;
+      const result = await exports.deliveryEngine(userId, targetOverride);
       res.status(200).json(result);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -612,6 +681,20 @@ exports.runCompanionAgent = (req, res) => {
     try {
       const result = await exports.companionAgent(req, res);
       // exports.companionAgent handles the response itself due to cors wrapper pattern
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+};
+
+/**
+ * 10. runEmergencyMonitor: 緊急監視手動実行 (デモ用)
+ */
+exports.runEmergencyMonitor = (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const result = await exports.emergencyMonitor();
+      res.status(200).json(result);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

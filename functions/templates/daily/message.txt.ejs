@@ -1,0 +1,17 @@
+Amber Ink：今日の<%= name %>さんへ
+
+    こんにちは、<%= name %>さん。今日の琥珀からの便りをお届けします。
+
+        <% snippets.forEach(function(snippet) { %>
+            【<%= snippet.topic %>】
+                <%= snippet.text %>
+
+                    <% }); %>
+
+                        一言だけで構いません。今日のあなたの輝きを聞かせていただけませんか？
+
+                        ▼ 生存確認（チェックイン）はこちら
+                        <%= checkInUrl %>
+
+                            ---
+                            このメールは Amber Ink から自動送信されています。

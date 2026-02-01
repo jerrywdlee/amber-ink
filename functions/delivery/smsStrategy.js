@@ -6,9 +6,11 @@ class SmsStrategy extends BaseDeliveryStrategy {
     }
 
     async send(user, deliveryData) {
-        console.log(`[SmsStrategy] (STUB) Sending to ${user.name} via Twilio/etc.`);
+        const { targetOverride } = deliveryData;
+        const target = targetOverride === 'emergency' ? 'Emergency' : 'Self';
+        console.log(`[SmsStrategy] (STUB) Sending to ${user.name} via Twilio/etc. (Target: ${target})`);
         // Future implementation: call SMS provider API
-        return { success: true, message: 'SMS delivery simulated' };
+        return { success: true, message: `SMS delivery to ${target} simulated` };
     }
 }
 

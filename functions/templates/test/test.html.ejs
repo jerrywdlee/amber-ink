@@ -1,0 +1,28 @@
+<div
+    style="font-family: sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px dashed #6366f1; padding: 20px; border-radius: 10px; background-color: #f5f3ff;">
+    <h2 style="color: #4f46e5; margin-top: 0;">【テスト配信】Amber Ink 動作確認</h2>
+    <p>
+        これは、Amber Ink の <%= target_label %> 宛て配信テストメールです。<br>
+            <%= name %>さんのご指示により送信されています。
+    </p>
+
+    <div style="background-color: white; padding: 15px; border-radius: 8px; border: 1px solid #e0e7ff; margin: 20px 0;">
+        <p style="margin: 0; color: #4338ca; font-weight: bold;">
+            ✔ システムは正常に稼働しています。
+        </p>
+        <p style="font-size: 14px; margin-bottom: 0;">
+            本番の配信では、この場所に毎日のニュースや、緊急時のアラートが表示されます。
+        </p>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="<%= checkInUrl %>"
+            style="background-color: #6366f1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 14px;">
+            テスト用チェックインボタン
+        </a>
+    </div>
+
+    <p style="font-size: 12px; color: #666; text-align: center;">
+        このメールを確認できましたら、Amber のチャットへお戻りください。
+    </p>
+</div>

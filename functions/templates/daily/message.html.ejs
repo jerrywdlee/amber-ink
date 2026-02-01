@@ -1,0 +1,27 @@
+<div style="font-family: sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+  <h2 style="color: #d97706;">Amber Ink</h2>
+  <p>こんにちは、<%= name %>さん。今日の琥珀からの便りをお届けします。</p>
+  
+  <div style="margin: 20px 0; border-left: 4px solid #f59e0b; padding-left: 15px;">
+    <% snippets.forEach(function(snippet) { %>
+      <div style="margin-bottom: 20px;">
+        <p style="font-weight: bold; color: #92400e; margin-bottom: 5px;">【<%= snippet.topic %>】</p>
+        <p style="margin-top: 0; line-height: 1.6;"><%= snippet.text %></p>
+      </div>
+    <% }); %>
+  </div>
+
+  <div style="margin-top: 30px; text-align: center;">
+    <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
+      一言だけで構いません。今日のあなたの輝きを聞かせていただけませんか？
+    </p>
+    <a href="<%= checkInUrl %>" style="background-color: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+      今日の輝きを確認する (Check-in)
+    </a>
+  </div>
+
+  <p style="font-size: 11px; color: #999; margin-top: 40px; text-align: center; border-top: 1px solid #eee; pt-20">
+    このメールは Amber Ink から自動送信されています。<br>
+    あなたの日常を宝石のように守るお手伝いをしています。
+  </p>
+</div>

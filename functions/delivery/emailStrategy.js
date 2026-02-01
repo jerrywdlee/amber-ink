@@ -1,49 +1,72 @@
 const nodemailer = require('nodemailer');
+const ejs = require('ejs');
+const path = require('path');
 const BaseDeliveryStrategy = require('./baseStrategy');
 
 class EmailStrategy extends BaseDeliveryStrategy {
-    constructor() {
-        super('Email');
-        this.transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: process.env.SMTP_PORT || 587,
-            secure: process.env.SMTP_PORT == 465,
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-        });
+  constructor() {
+    super('Email');
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT || 587,
+      secure: process.env.SMTP_PORT == 465,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+
+  async send(user, deliveryData) {
+    const { targetOverride, type = 'daily' } = deliveryData;
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const checkInUrl = `${process.env.BASE_FUNCTION_URL || 'http://localhost:8080'}/checkIn?uid=${user.userId}`;
+
+    let recipient = user.contact;
+    let templateDir = 'daily';
+    let templateData = {
+      name: user.name,
+      checkInUrl: checkInUrl
+    };
+
+    // Determine recipient and template based on type and override
+    if (targetOverride === 'emergency' || type === 'emergency') {
+      recipient = user.emergency_contact;
+      templateDir = 'emergency';
+      const lastSeen = user.last_seen ? new Date(user.last_seen) : new Date(user.created_at);
+      const daysMissing = Math.floor((new Date() - lastSeen) / (1000 * 60 * 60 * 24));
+      templateData.days_missing = daysMissing || 1;
     }
 
-    async send(user, deliveryData) {
-        const { content_html, content_text, checkInUrl } = deliveryData;
-        const recipient = user.contact || user.emergency_contact;
-
-        console.log(`[EmailStrategy] Sending to ${user.name} (${recipient})`);
-
-        const emailHtml = `
-      <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-        <h2 style="color: #d97706;">Amber Ink</h2>
-        ${content_html}
-        <div style="margin-top: 30px; text-align: center;">
-          <a href="${checkInUrl}" style="background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block;">
-            今日の輝きを確認する (Check-in)
-          </a>
-        </div>
-        <p style="font-size: 12px; color: #999; margin-top: 40px; text-align: center;">
-          このメールは Amber Ink から自動送信されています。
-        </p>
-      </div>
-    `;
-
-        return await this.transporter.sendMail({
-            from: '"Amber Ink" <no-reply@amber-ink.local>',
-            to: recipient,
-            subject: `琥珀の輝き：今日の ${user.name} さんへ`,
-            text: content_text + `\n\nCheck-in here: ${checkInUrl}`,
-            html: emailHtml,
-        });
+    if (targetOverride) {
+      // It's a test delivery
+      templateDir = 'test';
+      templateData.target_label = targetOverride === 'self' ? '自分' : '緊急連絡先';
+      if (targetOverride === 'self') recipient = user.contact;
+    } else if (type === 'daily') {
+      templateData.snippets = user.scheduled_delivery?.snippets || [];
     }
+
+    console.log(`[EmailStrategy] Sending ${type} to ${user.name} (${recipient}) via ${templateDir} template`);
+
+    const htmlPath = path.join(__dirname, '..', 'templates', templateDir, templateDir === 'daily' ? 'message.html.ejs' : templateDir === 'emergency' ? 'alert.html.ejs' : 'test.html.ejs');
+    const txtPath = path.join(__dirname, '..', 'templates', templateDir, templateDir === 'daily' ? 'message.txt.ejs' : templateDir === 'emergency' ? 'alert.txt.ejs' : 'test.txt.ejs');
+
+    const html = await ejs.renderFile(htmlPath, templateData);
+    const text = await ejs.renderFile(txtPath, templateData);
+
+    const subject = type === 'emergency' ? `【重要/緊急】Amber Ink よりお知らせ` :
+      targetOverride ? `【テスト配信】Amber Ink 動作確認` :
+        `琥珀の輝き：今日の ${user.name} さんへ`;
+
+    return await this.transporter.sendMail({
+      from: '"Amber Ink" <no-reply@amber-ink.local>',
+      to: recipient,
+      subject: subject,
+      text: text,
+      html: html,
+    });
+  }
 }
 
 module.exports = EmailStrategy;

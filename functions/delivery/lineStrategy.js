@@ -6,9 +6,11 @@ class LineStrategy extends BaseDeliveryStrategy {
     }
 
     async send(user, deliveryData) {
-        console.log(`[LineStrategy] (STUB) Sending to ${user.name} via Messaging API`);
+        const { targetOverride } = deliveryData;
+        const target = targetOverride === 'emergency' ? 'Emergency' : 'Self';
+        console.log(`[LineStrategy] (STUB) Sending to ${user.name} via Messaging API (Target: ${target})`);
         // Future implementation: fetch LINE user ID and call Messaging API
-        return { success: true, message: 'LINE delivery simulated' };
+        return { success: true, message: `LINE delivery to ${target} simulated` };
     }
 }
 
