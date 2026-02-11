@@ -177,8 +177,7 @@ exports.onboardingAgent = (req, res) => {
               },
               $setOnInsert: {
                 created_at: new Date().toISOString(),
-                checkins: [new Date().toISOString()],
-                last_seen: new Date().toISOString()
+                checkins: [new Date().toISOString()]
               }
             },
             { upsert: true }
@@ -210,7 +209,7 @@ exports.companionAgent = (req, res) => {
 
       const database = await connectToDb();
       const users = database.collection('users');
-      const user = await users.findOne({ userId, appId });
+      const user = await users.findOne({ userId, appId }, { projection: { checkins: { $slice: -20 } } });
 
       if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -383,7 +382,7 @@ exports.deliveryEngine = async (targetUserId, targetOverride) => {
       if (targetUserId) query.userId = targetUserId;
     }
 
-    const users = await database.collection('users').find(query).toArray();
+    const users = await database.collection('users').find(query, { projection: { checkins: { $slice: -20 } } }).toArray();
 
     if (users.length === 0) return { success: true, sent: 0 };
 
@@ -497,7 +496,7 @@ exports.aiAnalyzer = async (targetUserId) => {
  */
 exports.getUserData = (req, res) => {
   cors(req, res, async () => {
-    const { userId } = req.query;
+    const { userId, autoCheckin } = req.query;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
@@ -507,9 +506,44 @@ exports.getUserData = (req, res) => {
       }
 
       const database = await connectToDb();
-      const user = await database.collection('users').findOne({ userId, appId });
+      let user = await database.collection('users').findOne(
+        { userId, appId },
+        { projection: { checkins: { $slice: -20 } } }
+      );
 
       if (!user) return res.status(404).json({ error: 'User not found' });
+
+      // 自動チェックイン: 前回の記録から1時間以上経過、または日を跨いだ場合に実行
+      if (autoCheckin) {
+        const now = new Date();
+        const lastCheckinStr = user.checkins && user.checkins.length > 0
+          ? user.checkins[user.checkins.length - 1]
+          : user.created_at;
+        const last = new Date(lastCheckinStr);
+
+        const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
+        const isDifferentDay = now.toDateString() !== last.toDateString();
+
+        if (last < oneHourAgo || isDifferentDay) {
+          console.log(`[AutoCheckin] Triggered for ${userId}. Last seen: ${lastCheckinStr}`);
+          await database.collection('users').updateOne(
+            { userId, appId },
+            {
+              $push: { checkins: now.toISOString() },
+              $set: {
+                emergency_notified: false,
+                updatedAt: now
+              }
+            }
+          );
+          // 最新のデータに更新して返す（20件に制限）
+          user = await database.collection('users').findOne(
+            { userId, appId },
+            { projection: { checkins: { $slice: -20 } } }
+          );
+        }
+      }
+
       res.status(200).json(user);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -526,12 +560,17 @@ exports.emergencyMonitor = async () => {
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-    // 3日以上 last_seen が更新されておらず、かつステータスが active のユーザー
+    // 3日以上アクティビティがなく、かつステータスが active のユーザー
     const users = await database.collection('users').find({
       status: 'active',
-      last_seen: { $lt: threeDaysAgo.toISOString() },
-      emergency_notified: { $ne: true } // 一度通知したら重複しないようにする
-    }).toArray();
+      emergency_notified: { $ne: true },
+      $expr: {
+        $lt: [
+          { $arrayElemAt: ["$checkins", -1] },
+          threeDaysAgo.toISOString()
+        ]
+      }
+    }, { projection: { checkins: { $slice: -20 } } }).toArray();
 
     console.log(`Emergency Monitor: Found ${users.length} inactive users.`);
 
@@ -585,15 +624,17 @@ exports.registerUser = (req, res) => {
         personaSummary: personaSummary, // セッションから移行
         status: 'active',
         created_at: new Date().toISOString(),
-        checkins: [], // Removed initial check-in
-        last_seen: new Date().toISOString(),
+        checkins: [new Date().toISOString()],
         updatedAt: new Date()
       };
 
       await users.updateOne({ userId, appId }, { $set: userData }, { upsert: true });
 
-      // 最新のデータを取得して返す
-      const savedUser = await users.findOne({ userId, appId });
+      // 最新のデータを取得して返す（20件に制限）
+      const savedUser = await users.findOne(
+        { userId, appId },
+        { projection: { checkins: { $slice: -20 } } }
+      );
 
       // 登録完了後、セッションを削除してクリーンアップ
       try {
@@ -639,7 +680,7 @@ exports.checkIn = (req, res) => {
       const result = await database.collection('users').updateOne(
         { userId, appId },
         {
-          $set: { last_seen: new Date().toISOString(), updatedAt: new Date() },
+          $set: { updatedAt: new Date() },
           $addToSet: { checkins: today },
           $unset: { emergency_notified: "" }
         }
@@ -730,13 +771,19 @@ exports.downloadMemorial = (req, res) => {
 
     try {
       const database = await connectToDb();
-      const user = await database.collection('users').findOne({ userId, appId });
+      const user = await database.collection('users').findOne(
+        { userId, appId },
+        { projection: { checkins: { $slice: -20 } } }
+      );
 
       if (!user) return res.status(404).json({ error: 'User not found' });
 
       const templatePath = path.join(__dirname, 'templates', 'memorial', 'page.html.ejs');
 
-      const lastSeen = user.last_seen ? new Date(user.last_seen) : new Date(user.created_at);
+      const lastCheckinStr = user.checkins && user.checkins.length > 0
+        ? user.checkins[user.checkins.length - 1]
+        : user.created_at;
+      const lastSeen = new Date(lastCheckinStr);
       const templateData = {
         name: user.name,
         interest: user.interest,

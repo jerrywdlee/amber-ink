@@ -34,7 +34,10 @@ class EmailStrategy extends BaseDeliveryStrategy {
     if (targetOverride === 'emergency' || type === 'emergency') {
       recipient = user.emergency_contact;
       templateDir = 'emergency';
-      const lastSeen = user.last_seen ? new Date(user.last_seen) : new Date(user.created_at);
+      const lastCheckinStr = user.checkins && user.checkins.length > 0
+        ? user.checkins[user.checkins.length - 1]
+        : user.created_at;
+      const lastSeen = new Date(lastCheckinStr);
       const daysMissing = Math.floor((new Date() - lastSeen) / (1000 * 60 * 60 * 24));
       templateData.days_missing = daysMissing || 1;
     }

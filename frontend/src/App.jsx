@@ -76,10 +76,14 @@ export default function App() {
     const uidFromUrl = urlParams.get('uid');
     const viewMode = urlParams.get('view');
 
-    const fetchUserData = async (id, isEmergency = false) => {
+    const fetchUserData = async (id, isEmergency = false, auto = false) => {
       if (!id) return;
       try {
-        const res = await fetch(`${import.meta.env.VITE_GET_USER_DATA_URL}?userId=${id}`, {
+        const url = new URL(import.meta.env.VITE_GET_USER_DATA_URL);
+        url.searchParams.append('userId', id);
+        if (auto) url.searchParams.append('autoCheckin', '1');
+
+        const res = await fetch(url.toString(), {
           headers: {
             'Authorization': `Bearer ${id}`
           }
@@ -105,7 +109,7 @@ export default function App() {
     if (viewMode === 'emergency' && uidFromUrl) {
       console.log('Emergency View mode detected for UID:', uidFromUrl);
       setUserId(uidFromUrl); // Set temporary userId for fetching
-      fetchUserData(uidFromUrl, true);
+      fetchUserData(uidFromUrl, true, false);
       // CLEANUP: Do NOT save to localStorage for emergency view to isolate family from member session
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
@@ -120,7 +124,7 @@ export default function App() {
     }
 
     if (userId) {
-      fetchUserData(userId);
+      fetchUserData(userId, false, true);
     } else {
       setIsLoading(false);
     }

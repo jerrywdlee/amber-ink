@@ -1,24 +1,19 @@
 import React from 'react';
 import { Award } from 'lucide-react';
 import { GlassCard } from './GlassCard';
+import { formatDateLocal } from '../utils/helpers';
 
 export const StreakCalendar = ({ userData }) => {
     const rawCheckins = userData?.checkins || [];
 
     // 1. 各チェックイン（ISO文字列）を日付（YYYY-MM-DD）に変換し、重複を排除
-    const checkins = [...new Set(rawCheckins.map(c => {
-        try {
-            return new Date(c).toISOString().split('T')[0];
-        } catch (e) {
-            return c.split('T')[0];
-        }
-    }))];
+    const checkins = [...new Set(rawCheckins.map(c => formatDateLocal(c)).filter(Boolean))];
 
     // 2. カレンダーの開始日を決定
     // 直近5日間（今日を含む）の中で、最も古いチェックイン日を開始点にする
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() - 4); // 今日を含めて5日間
-    const thresholdStr = thresholdDate.toISOString().split('T')[0];
+    const thresholdStr = formatDateLocal(thresholdDate);
 
     const recentInWindow = checkins
         .filter(d => d >= thresholdStr)
@@ -32,16 +27,17 @@ export const StreakCalendar = ({ userData }) => {
     const days = Array.from({ length: 28 }, (_, i) => {
         const date = new Date(startDate);
         date.setDate(date.getDate() + i);
-        return date.toISOString().split('T')[0];
+        return formatDateLocal(date);
     });
 
     // 4. 今日から遡って連続しているチェックイン（現在のストリーク）を特定
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = formatDateLocal(new Date());
     const currentStreakDays = [];
     if (checkins.includes(todayStr)) {
         let checkDate = new Date(todayStr);
-        while (checkins.includes(checkDate.toISOString().split('T')[0])) {
-            currentStreakDays.push(checkDate.toISOString().split('T')[0]);
+        while (checkins.includes(formatDateLocal(checkDate))) {
+            const dateStr = formatDateLocal(checkDate);
+            currentStreakDays.push(dateStr);
             checkDate.setDate(checkDate.getDate() - 1);
         }
     }

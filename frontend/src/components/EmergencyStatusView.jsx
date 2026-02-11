@@ -27,8 +27,9 @@ export function EmergencyStatusView({ userId, userData }) {
     };
 
     useEffect(() => {
-        if (userData && userData.last_seen) {
-            const last = new Date(userData.last_seen);
+        if (userData && userData.checkins && userData.checkins.length > 0) {
+            const lastCheckinStr = userData.checkins[userData.checkins.length - 1];
+            const last = new Date(lastCheckinStr);
             setLastCheckin(last.toLocaleString('ja-JP'));
             const diff = Math.floor((new Date() - last) / (1000 * 60 * 60 * 24));
             setDaysSince(diff);
