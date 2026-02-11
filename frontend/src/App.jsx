@@ -271,7 +271,27 @@ export default function App() {
     }
   };
 
-  const startJewelryBox = () => setMode('jewelryBox');
+  const startJewelryBox = async () => {
+    setIsLoading(true);
+    try {
+      const url = new URL(import.meta.env.VITE_GET_USER_DATA_URL);
+      url.searchParams.append('userId', userId);
+      url.searchParams.append('includeJewelryMeta', '1');
+
+      const res = await fetch(url.toString(), {
+        headers: { 'Authorization': `Bearer ${userId}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserData(data);
+      }
+    } catch (e) {
+      console.error("Fetch Jewelry Box meta error:", e);
+    } finally {
+      setIsLoading(false);
+      setMode('jewelryBox');
+    }
+  };
 
   const handleSendCompanionMessage = async (overrideMsg = null) => {
     if (!overrideMsg && (!inputValue.trim() || isTypingCompanion)) return;

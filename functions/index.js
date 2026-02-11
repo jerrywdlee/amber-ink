@@ -496,7 +496,7 @@ exports.aiAnalyzer = async (targetUserId) => {
  */
 exports.getUserData = (req, res) => {
   cors(req, res, async () => {
-    const { userId, autoCheckin } = req.query;
+    const { userId, autoCheckin, includeJewelryMeta } = req.query;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
@@ -506,9 +506,21 @@ exports.getUserData = (req, res) => {
       }
 
       const database = await connectToDb();
+
+      // Default projection: hide jewelryBox completely for performance/security
+      let projection = { checkins: { $slice: -20 }, jewelryBox: 0 };
+
+      // If metadata is requested, include it but ALWAYS exclude the huge memoryBundle
+      if (includeJewelryMeta) {
+        projection = {
+          checkins: { $slice: -20 },
+          'jewelryBox.memoryBundle': 0
+        };
+      }
+
       let user = await database.collection('users').findOne(
         { userId, appId },
-        { projection: { checkins: { $slice: -20 }, jewelryBox: 0 } }
+        { projection }
       );
 
       if (!user) return res.status(404).json({ error: 'User not found' });
