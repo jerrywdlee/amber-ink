@@ -220,12 +220,17 @@ export const JewelryBoxView = ({ userData, updateUserMetadata }) => {
                                             await new Promise(r => setTimeout(r, 600));
                                             setMessages([{
                                                 role: 'ai',
-                                                text: '承知いたしました。これまでの封印を解き、新しい宝石箱を準備しますね。'
+                                                text: '承知いたしました。以前の宝石箱を一度破棄し、新しい物語を始める準備を整えますね。'
                                             }]);
                                             await new Promise(r => setTimeout(r, 600));
                                             setMessages(prev => [...prev, {
                                                 role: 'ai',
                                                 text: '下の宝石箱の中からお好きなものを一つ選んでみてください。'
+                                            }]);
+                                            await new Promise(r => setTimeout(r, 600));
+                                            setMessages(prev => [...prev, {
+                                                role: 'ai',
+                                                text: 'もし気が変わって再作成をやめる場合は、お手数ですが右上の「＜」ボタンで一度戻ってください。'
                                             }]);
                                             setIsTyping(false);
 
