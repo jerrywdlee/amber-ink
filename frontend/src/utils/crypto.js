@@ -121,7 +121,10 @@ export const unwrapAESKey = async (wrappedKeyBase64, rsaPrivateKey) => {
 // --- Export/Import Utilities ---
 
 /**
- * Exports a key to Base64 (Spki for Public, Pkcs8 for Private, Raw for Symmetric).
+ * Exports a key to Base64.
+ * - SPKI for RSA Public
+ * - PKCS8 for RSA Private
+ * - RAW for AES
  */
 export const exportKey = async (key, format = 'raw') => {
     const exported = await window.crypto.subtle.exportKey(format, key);
@@ -130,8 +133,15 @@ export const exportKey = async (key, format = 'raw') => {
 
 /**
  * Imports a key from Base64.
+ * - format: 'spki', 'pkcs8', or 'raw'
  */
 export const importKey = async (base64, algorithm, format = 'raw', usages = ['encrypt', 'decrypt']) => {
     const buffer = base64ToArrayBuffer(base64);
-    return await window.crypto.subtle.importKey(format, buffer, algorithm, true, usages);
+    // For RSA-OAEP PKCS8/SPKI, we specify the hash in the algorithm object if needed
+    const importAlgo = typeof algorithm === 'string' ? { name: algorithm } : algorithm;
+
+    // Default usages for RSA keys if not provided
+    const keyUsages = usages || (format === 'spki' ? ['wrapKey'] : ['unwrapKey']);
+
+    return await window.crypto.subtle.importKey(format, buffer, importAlgo, true, keyUsages);
 };

@@ -62,16 +62,12 @@ export const embedDataInImage = async (imageSrc, dataStr) => {
                 return;
             }
 
-            // 2. Embed bits into LSB of Red/Green/Blue channels
+            // 2. Embed bits into LSB of Alpha channel (Safe from color management)
             for (let i = 0; i < binaryData.length; i++) {
-                // Skip the 4th channel (Alpha) or use it? Let's use RGB for now.
-                // Every index i maps to a pixel channel.
-                // i=0 -> pixels[0] (R), i=1 -> pixels[1] (G), i=2 -> pixels[2] (B)
-                // We skip every 4th (Alpha) to avoid opacity issues if possible.
-                const pixelIndex = Math.floor(i / 3) * 4 + (i % 3);
+                const pixelIndex = i * 4 + 3; // Alpha channel
                 const bit = parseInt(binaryData[i]);
 
-                // Set the LSB to the bit
+                // Set the LSB of Alpha to the bit
                 pixels[pixelIndex] = (pixels[pixelIndex] & 0xFE) | bit;
             }
 
@@ -99,11 +95,12 @@ export const extractDataFromImage = (canvas) => {
 
     let binaryData = '';
     // We check enough pixels to find our delimiter
-    // A safe upper bound for a Base64 AES key + IV is ~1KB
-    const maxBits = 8000;
+    // A safe upper bound for a Base64 RSA Private Key (PKCS#8) is ~2-3KB
+    // RSA-2048 private key is roughly 1700-1800 chars in Base64
+    const maxBits = 64000;
 
-    for (let i = 0; i < Math.min(maxBits, (pixels.length / 4) * 3); i++) {
-        const pixelIndex = Math.floor(i / 3) * 4 + (i % 3);
+    for (let i = 0; i < Math.min(maxBits, pixels.length / 4); i++) {
+        const pixelIndex = i * 4 + 3; // Alpha channel
         binaryData += (pixels[pixelIndex] & 1).toString();
     }
 

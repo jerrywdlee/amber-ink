@@ -82,6 +82,7 @@ export default function App() {
       try {
         const url = new URL(import.meta.env.VITE_GET_USER_DATA_URL);
         url.searchParams.append('userId', id);
+        url.searchParams.append('includeJewelryMeta', '1');
         if (auto) url.searchParams.append('autoCheckin', '1');
 
         const res = await fetch(url.toString(), {

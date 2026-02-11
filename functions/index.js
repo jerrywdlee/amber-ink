@@ -510,11 +510,10 @@ exports.getUserData = (req, res) => {
       // Default projection: hide jewelryBox completely for performance/security
       let projection = { checkins: { $slice: -20 }, jewelryBox: 0 };
 
-      // If metadata is requested, include it but ALWAYS exclude the huge memoryBundle
+      // If metadata is requested, include everything in jewelryBox
       if (includeJewelryMeta) {
         projection = {
-          checkins: { $slice: -20 },
-          'jewelryBox.memoryBundle': 0
+          checkins: { $slice: -20 }
         };
       }
 
