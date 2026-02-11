@@ -67,7 +67,7 @@ export default function App() {
   }, [companionMessages, userId]);
 
   const [inputValue, setInputValue] = useState('');
-  const [formData, setFormData] = useState({ name: '', interest: '', emergency: '' });
+  const [formData, setFormData] = useState({ name: '', interest: '', contact: '', emergency: '' });
   const chatEndRef = useRef(null);
   const companionChatEndRef = useRef(null);
 
@@ -172,6 +172,7 @@ export default function App() {
           userId,
           name: data.name,
           interest: data.interest,
+          contact: data.contact,
           emergency_contact: data.emergency_contact || data.emergency
         })
       });

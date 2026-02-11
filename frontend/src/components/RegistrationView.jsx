@@ -92,6 +92,15 @@ export const RegistrationView = ({
                         />
                     </div>
                     <div>
+                        <label className="block text-amber-700 mb-1 ml-2">ご自身の連絡先 (Email・携帯番号など)</label>
+                        <input
+                            className="w-full p-4 rounded-2xl bg-white/50 border border-white/50 focus:ring-2 ring-amber-400 outline-none"
+                            placeholder="ご自身のEmailや電話番号"
+                            value={formData.contact}
+                            onChange={e => setFormData({ ...formData, contact: e.target.value })}
+                        />
+                    </div>
+                    <div>
                         <label className="block text-amber-700 mb-1 ml-2">見守りサポーター (Email・携帯番号など)</label>
                         <input
                             className="w-full p-4 rounded-2xl bg-white/50 border border-white/50 focus:ring-2 ring-amber-400 outline-none"
