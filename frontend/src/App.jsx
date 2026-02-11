@@ -121,7 +121,7 @@ export default function App() {
       routeProcessed.current = true;
       setUserId(uidFromUrl);
       fetchUserData(uidFromUrl, true, false);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // URLを消さないように変更（家族が共有・ブックマークしやすくするため）
       return;
     }
 
