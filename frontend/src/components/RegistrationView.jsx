@@ -6,6 +6,7 @@ export const RegistrationView = ({
     regType,
     chatMessages,
     isTyping,
+    typingMessage = '入力中...',
     chatEndRef,
     inputValue,
     setInputValue,
@@ -15,6 +16,7 @@ export const RegistrationView = ({
     saveUserData
 }) => {
     if (regType === 'chat') {
+        const isDisabled = isTyping;
         return (
             <div className="relative z-10 flex flex-col h-[78vh]">
                 <div className="flex-1 overflow-y-auto space-y-4 pb-4 px-1 scrollbar-hide">
@@ -36,23 +38,25 @@ export const RegistrationView = ({
                                     <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                                     <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce"></span>
                                 </div>
-                                <span className="text-[10px] font-bold text-amber-900 uppercase tracking-widest opacity-60">入力中...</span>
+                                <span className="text-[10px] font-bold text-amber-900 uppercase tracking-widest opacity-60">{typingMessage}</span>
                             </div>
                         </div>
                     )}
                     <div ref={chatEndRef} />
                 </div>
-                <GlassCard className="p-2 rounded-full flex items-center mt-4">
+                <GlassCard className={`p-2 rounded-full flex items-center mt-4 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
                     <input
                         className="flex-1 bg-transparent px-5 py-3 outline-none text-amber-900 placeholder-amber-700/50"
-                        placeholder="想いを入力..."
+                        placeholder={isDisabled ? typingMessage : "想いを入力..."}
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                        onKeyPress={(e) => e.key === 'Enter' && !isDisabled && handleSendMessage()}
+                        disabled={isDisabled}
                     />
                     <button
                         onClick={handleSendMessage}
-                        className="w-11 h-11 bg-amber-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-95 transition-transform"
+                        disabled={isDisabled}
+                        className={`w-11 h-11 bg-amber-500 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${isDisabled ? 'scale-90' : 'hover:scale-95'}`}
                     >
                         <Send className="w-5 h-5" />
                     </button>

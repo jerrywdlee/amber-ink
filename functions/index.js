@@ -183,6 +183,10 @@ exports.onboardingAgent = (req, res) => {
             },
             { upsert: true }
           );
+
+          // 保存済みの最新データをresponseDataに含める
+          const updatedUser = await users.findOne({ userId, appId });
+          responseData.user = updatedUser;
         }
       }
 

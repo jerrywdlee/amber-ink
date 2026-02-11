@@ -97,6 +97,8 @@ export default function App() {
             'Authorization': `Bearer ${id}`
           }
         });
+        console.log('User data response:', res);
+
         if (res.ok) {
           const data = await res.json();
           if (data && data.userId) {
@@ -176,8 +178,6 @@ export default function App() {
       if (res.ok) {
         const updated = await res.json();
         setUserData(updated);
-        // 登録成功時にオンボーディングの会話履歴をクリア
-        localStorage.removeItem('amber_ink_chat_history');
         setMode('dashboard');
       }
     } catch (e) {
@@ -376,6 +376,8 @@ export default function App() {
     }
   };
 
+  const [typingMessage, setTypingMessage] = useState('入力中...');
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping) return;
     const userMsg = inputValue.trim();
@@ -383,6 +385,7 @@ export default function App() {
     const newMessages = [...chatMessages, { role: 'user', text: userMsg }];
     setChatMessages(newMessages);
     setIsTyping(true);
+    setTypingMessage('入力中...');
 
     try {
       const res = await fetch(import.meta.env.VITE_CLOUD_FUNCTION_URL, {
@@ -395,6 +398,8 @@ export default function App() {
       });
       const data = await res.json();
 
+      console.log('Chat response:', data);
+
       // [SPLIT] でメッセージを分割して順次表示
       const messages = data.text.split('[SPLIT]').map(s => s.trim()).filter(s => s);
 
@@ -405,16 +410,22 @@ export default function App() {
         setChatMessages(prev => [...prev, { role: 'ai', text: msg }]);
       }
 
-      setIsTyping(false);
-
       if (data.is_complete) {
+        if (data.user) setUserData(data.user);
+        setTypingMessage('会員作成中...');
+        setIsTyping(true);
+        // 登録成功時にオンボーディングの会話履歴をクリア
+        localStorage.removeItem('amber_ink_chat_history');
         // AIによる登録完了時、画面を切り替えるために少し待機して再読込
-        await delay(3000);
+        await delay(2000);
         setIsLoading(true);
         await delay(2000);
         setMode('dashboard');
         setIsLoading(false);
+        setTypingMessage('入力中...');
       }
+
+      setIsTyping(false);
     } catch (error) {
       console.error('Error sending message:', error);
       setIsTyping(false);
@@ -456,7 +467,9 @@ export default function App() {
         <EmergencyStatusView userId={userId} userData={userData} />
       ) : mode === 'registration' ? (
         <RegistrationView
-          regType={regType} chatMessages={chatMessages} isTyping={isTyping} chatEndRef={chatEndRef}
+          regType={regType} chatMessages={chatMessages} isTyping={isTyping}
+          typingMessage={typingMessage}
+          chatEndRef={chatEndRef}
           inputValue={inputValue} setInputValue={setInputValue} handleSendMessage={handleSendMessage}
           formData={formData} setFormData={setFormData} saveUserData={saveUserData}
         />
