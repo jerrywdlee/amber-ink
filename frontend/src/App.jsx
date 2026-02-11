@@ -176,6 +176,31 @@ export default function App() {
     }
   };
 
+  const updateUserMetadata = async (metadata) => {
+    try {
+      const res = await fetch(import.meta.env.VITE_REGISTER_USER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
+        },
+        body: JSON.stringify({
+          userId,
+          ...metadata
+        })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setUserData(updated);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Metadata update failed:", e);
+      return false;
+    }
+  };
+
   const initiateCompanionGreeting = async () => {
     setIsTypingCompanion(true);
     setCompanionSuggestions([]);
@@ -413,7 +438,7 @@ export default function App() {
           companionSuggestions={companionSuggestions} inputValue={inputValue} setInputValue={setInputValue}
         />
       ) : mode === 'jewelryBox' ? (
-        <JewelryBoxView userData={userData} />
+        <JewelryBoxView userData={userData} updateUserMetadata={updateUserMetadata} />
       ) : (
         <DashboardView
           userData={userData}

@@ -508,7 +508,7 @@ exports.getUserData = (req, res) => {
       const database = await connectToDb();
       let user = await database.collection('users').findOne(
         { userId, appId },
-        { projection: { checkins: { $slice: -20 } } }
+        { projection: { checkins: { $slice: -20 }, jewelryBox: 0 } }
       );
 
       if (!user) return res.status(404).json({ error: 'User not found' });
@@ -615,20 +615,19 @@ exports.registerUser = (req, res) => {
       const sessionDoc = await sessions.findOne({ userId, appId });
       const personaSummary = sessionDoc ? sessionDoc.personaSummary : '親しい友人。';
 
-      const userData = {
-        userId,
-        appId,
-        name: name.trim(),
-        interest: interest.trim(),
-        emergency_contact: emergency_contact.trim(),
-        personaSummary: personaSummary, // セッションから移行
-        status: 'active',
-        created_at: new Date().toISOString(),
-        checkins: [new Date().toISOString()],
-        updatedAt: new Date()
+      const payload = { ...req.body, updatedAt: new Date() };
+
+      // If it's a first-time registration, ensure status and created_at are set
+      const updateOp = {
+        $set: payload,
+        $setOnInsert: {
+          status: 'active',
+          created_at: new Date().toISOString(),
+          checkins: [new Date().toISOString()]
+        }
       };
 
-      await users.updateOne({ userId, appId }, { $set: userData }, { upsert: true });
+      await users.updateOne({ userId, appId }, updateOp, { upsert: true });
 
       // 最新のデータを取得して返す（20件に制限）
       const savedUser = await users.findOne(

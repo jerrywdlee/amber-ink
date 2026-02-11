@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Gem, Sparkles, X } from 'lucide-react';
 import { GlassCard } from './GlassCard';
+import { sealMemory, downloadKeyImage } from '../utils/jewelryBoxCrypto';
 
-export const JewelryBoxView = ({ userData }) => {
+export const JewelryBoxView = ({ userData, updateUserMetadata }) => {
     const [messages, setMessages] = useState([]);
     const [isTyping, setIsTyping] = useState(false);
     const [selectedIcon, setSelectedIcon] = useState(null);
@@ -135,10 +136,27 @@ export const JewelryBoxView = ({ userData }) => {
                             />
 
                             <button
-                                onClick={() => {
-                                    alert('（現在はフロントエンドのみ）宝石箱に想いが封印されました。');
-                                    setSelectedIcon(null);
-                                    setMemoryText('');
+                                onClick={async () => {
+                                    if (!memoryText.trim()) return;
+
+                                    setIsTyping(true); // Show typing while "sealing"
+                                    const result = await sealMemory(memoryText, selectedIcon, userData?.name || 'Amber User');
+
+                                    if (result.success) {
+                                        const shortName = (userData?.name || 'User').substring(0, 8);
+                                        downloadKeyImage(result.keyImageBlob, `Amber-Key-${shortName}様.png`);
+
+                                        // Persist to DB
+                                        const savedInDb = await updateUserMetadata(result.persistenceData);
+                                        console.log('Jewelry Box Persistence Status:', savedInDb);
+
+                                        alert('想いが強力に暗号化され、宝石箱に封印されました。\n生成された「鍵の画像」を大切に保管してください。');
+                                        setSelectedIcon(null);
+                                        setMemoryText('');
+                                    } else {
+                                        alert('封印に失敗しました: ' + result.error);
+                                    }
+                                    setIsTyping(false);
                                 }}
                                 className="w-full py-3 bg-linear-to-br from-amber-500 to-amber-600 text-white rounded-full font-bold shadow-lg shadow-amber-500/20 active:scale-95 transition-transform flex items-center justify-center gap-2"
                             >
