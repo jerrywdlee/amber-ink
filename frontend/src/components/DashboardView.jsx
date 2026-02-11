@@ -6,6 +6,7 @@ import { StreakCalendar } from './StreakCalendar';
 export const DashboardView = ({
     userData,
     startCompanionChat,
+    startJewelryBox,
     triggerDeliveryTest
 }) => {
     return (
@@ -28,7 +29,7 @@ export const DashboardView = ({
             <StreakCalendar userData={userData} />
 
             <div className="grid grid-cols-2 gap-4">
-                <GlassCard className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+                <GlassCard onClick={() => startJewelryBox()} className="p-6 flex flex-col items-center gap-3 active:scale-95 transition-transform cursor-pointer">
                     <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center">
                         <Gem className="w-7 h-7 text-amber-600" />
                     </div>

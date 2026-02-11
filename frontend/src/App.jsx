@@ -4,6 +4,7 @@ import { RegistrationView } from './components/RegistrationView';
 import { DashboardView } from './components/DashboardView';
 import { CompanionChatView } from './components/CompanionChatView';
 import { EmergencyStatusView } from './components/EmergencyStatusView';
+import { JewelryBoxView } from './components/JewelryBoxView';
 import { LoadingScreen } from './components/LoadingScreen';
 import { delay } from './utils/helpers';
 
@@ -24,7 +25,7 @@ const getOrCreateUserId = () => {
 export default function App() {
   const [userId, setUserId] = useState(getOrCreateUserId());
   const [userData, setUserData] = useState(null);
-  const [mode, setMode] = useState('registration'); // 'registration', 'dashboard', 'companion'
+  const [mode, setMode] = useState('registration'); // 'registration', 'dashboard', 'companion', 'jewelryBox'
   const [regType, setRegType] = useState('chat'); // 'chat' or 'form'
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -245,6 +246,8 @@ export default function App() {
     }
   };
 
+  const startJewelryBox = () => setMode('jewelryBox');
+
   const handleSendCompanionMessage = async (overrideMsg = null) => {
     if (!overrideMsg && (!inputValue.trim() || isTypingCompanion)) return;
     const userMsg = overrideMsg || inputValue.trim();
@@ -409,8 +412,15 @@ export default function App() {
           triggerDeliveryTest={triggerDeliveryTest}
           companionSuggestions={companionSuggestions} inputValue={inputValue} setInputValue={setInputValue}
         />
+      ) : mode === 'jewelryBox' ? (
+        <JewelryBoxView userData={userData} />
       ) : (
-        <DashboardView userData={userData} startCompanionChat={startCompanionChat} triggerDeliveryTest={triggerDeliveryTest} />
+        <DashboardView
+          userData={userData}
+          startCompanionChat={startCompanionChat}
+          startJewelryBox={startJewelryBox}
+          triggerDeliveryTest={triggerDeliveryTest}
+        />
       )}
     </div>
   );
