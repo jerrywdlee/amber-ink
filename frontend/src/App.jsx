@@ -71,8 +71,12 @@ export default function App() {
   const chatEndRef = useRef(null);
   const companionChatEndRef = useRef(null);
 
+  const routeProcessed = useRef(false);
+
   // 初回データ読込
   useEffect(() => {
+    if (routeProcessed.current) return;
+
     const urlParams = new URLSearchParams(window.location.search);
     const uidFromUrl = urlParams.get('uid');
     const viewMode = urlParams.get('view');
@@ -83,7 +87,10 @@ export default function App() {
         const url = new URL(import.meta.env.VITE_GET_USER_DATA_URL);
         url.searchParams.append('userId', id);
         url.searchParams.append('includeJewelryMeta', '1');
-        if (auto) url.searchParams.append('autoCheckin', '1');
+        // 家族が閲覧している場合は絶対に自動チェックインを発生させない
+        if (auto && !isEmergency) {
+          url.searchParams.append('autoCheckin', '1');
+        }
 
         const res = await fetch(url.toString(), {
           headers: {
@@ -96,6 +103,7 @@ export default function App() {
             setUserData(data);
             if (isEmergency) {
               setMode('emergency');
+              console.log('Mode set to emergency');
             } else {
               if (mode === 'registration') setMode('dashboard');
             }
@@ -110,15 +118,16 @@ export default function App() {
 
     if (viewMode === 'emergency' && uidFromUrl) {
       console.log('Emergency View mode detected for UID:', uidFromUrl);
-      setUserId(uidFromUrl); // Set temporary userId for fetching
+      routeProcessed.current = true;
+      setUserId(uidFromUrl);
       fetchUserData(uidFromUrl, true, false);
-      // CLEANUP: Do NOT save to localStorage for emergency view to isolate family from member session
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
 
     if (uidFromUrl && uidFromUrl !== userId) {
       console.log('Detecting UID from URL (Internal login):', uidFromUrl);
+      routeProcessed.current = true;
       localStorage.setItem('amber_ink_userId', uidFromUrl);
       setUserId(uidFromUrl);
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -126,6 +135,7 @@ export default function App() {
     }
 
     if (userId) {
+      routeProcessed.current = true;
       fetchUserData(userId, false, true);
     } else {
       setIsLoading(false);

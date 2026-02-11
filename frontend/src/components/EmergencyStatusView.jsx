@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, Clock, Heart, Sparkles, MapPin, Download } from 'lucide-react';
+import { ShieldAlert, Clock, Heart, Sparkles, MapPin, Download, Gem } from 'lucide-react';
 
 export function EmergencyStatusView({ userId, userData }) {
     const [lastCheckin, setLastCheckin] = useState(null);
@@ -30,7 +30,8 @@ export function EmergencyStatusView({ userId, userData }) {
         if (userData && userData.checkins && userData.checkins.length > 0) {
             const lastCheckinStr = userData.checkins[userData.checkins.length - 1];
             const last = new Date(lastCheckinStr);
-            setLastCheckin(last.toLocaleString('ja-JP'));
+            const formatted = `${last.getFullYear()}年${last.getMonth() + 1}月${last.getDate()}日 ${last.getHours()}時${String(last.getMinutes()).padStart(2, '0')}分`;
+            setLastCheckin(formatted);
             const diff = Math.floor((new Date() - last) / (1000 * 60 * 60 * 24));
             setDaysSince(diff);
         }
@@ -100,6 +101,30 @@ export function EmergencyStatusView({ userId, userData }) {
                     </div>
                 </div>
             </div>
+
+            {/* Jewelry Box Section */}
+            {userData.jewelryBox && (
+                <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-6 border border-slate-200 shadow-sm mb-8">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3">
+                        <Gem size={20} className="text-amber-500" />
+                        封印された想い（琥珀の宝石箱）
+                    </h3>
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                        <div className="w-24 h-24 bg-amber-50 rounded-2xl flex items-center justify-center shrink-0 shadow-inner border border-amber-100 overflow-hidden">
+                            <img src={`/keyIcons/${userData.jewelryBox.keyImageName || 'key_01.png'}`} className="w-full h-full object-cover opacity-80" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm text-slate-600 leading-relaxed mb-3">
+                                会員様は大切な想いを「宝石箱」として封印しています。
+                                この想いは、会員様が託された<strong>お手元の「鍵画像」</strong>がなければ、Amber Inkであっても開けることはできません。
+                            </p>
+                            <p className="text-xs text-slate-500 bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">
+                                ※ 家族やサポーターの方がこの中身を確認するには、下の「記念ページをダウンロード」して開いた後、お手元の鍵画像を選択して解錠する必要があります。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Memorial Export Option */}
             <div className="bg-amber-100/50 border border-amber-200 rounded-3xl p-6 mb-8 text-center">

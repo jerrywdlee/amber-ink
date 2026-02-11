@@ -10,6 +10,7 @@ const cors = require('cors')({ origin: true });
 const deliveryService = require('./delivery');
 const path = require('path');
 const ejs = require('ejs');
+const fs = require('fs');
 
 const uri = process.env.MONGODB_URI || 'mongodb://mongodb:27017';
 const dbName = process.env.MONGODB_DB_NAME || 'amber_ink';
@@ -794,12 +795,25 @@ exports.downloadMemorial = (req, res) => {
         ? user.checkins[user.checkins.length - 1]
         : user.created_at;
       const lastSeen = new Date(lastCheckinStr);
+      let keyImageBase64 = null;
+      if (user.jewelryBox && user.jewelryBox.keyImageName) {
+        try {
+          const keyImagePath = path.join(__dirname, 'assets', 'keyIcons', user.jewelryBox.keyImageName);
+          const imageBuffer = await fs.promises.readFile(keyImagePath);
+          keyImageBase64 = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+        } catch (err) {
+          console.error('Error reading key image:', err);
+        }
+      }
+
       const templateData = {
         name: user.name,
         interest: user.interest,
         personaSummary: user.personaSummary || '大切な会員様として、琥珀が見守り続けました。',
         last_seen_formatted: lastSeen.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-        generated_at: new Date().toLocaleDateString('ja-JP')
+        generated_at: new Date().toLocaleDateString('ja-JP'),
+        jewelryBox: user.jewelryBox || null,
+        keyImageBase64
       };
 
       const html = await ejs.renderFile(templatePath, templateData);
