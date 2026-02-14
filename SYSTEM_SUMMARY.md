@@ -22,8 +22,10 @@ graph TD
         OnboardingAgent[onboardingAgent]
         CheckIn[checkIn API]
         DataMgr[registerUser API]
+        Companion[companionAgent - 対話/要約]
         AIAnalyzer[aiAnalyzer - 定期解析]
         Delivery[deliveryEngine - 定期配信]
+        Emergency[emergencyMonitor - 不活動検知]
     end
     
     subgraph "External & Storage"
@@ -84,9 +86,15 @@ stateDiagram-v2
     
     Dashboard --> CheckInAction: チェックイン実行
     CheckInAction --> Dashboard: 継続ストリーク更新 (宝石の繋がり)
-    
-    Dashboard --> [*]: ページ終了 (localStorage保存)
-    [*] --> Dashboard: 再訪 (userIdが存在する場合)
+
+    Dashboard --> CompanionChat: 琥珀との対話 (Companion)
+    CompanionChat --> Dashboard: 心境の更新 (Persona Summary)
+
+    Dashboard --> JewelryBox: 琥珀の宝石箱 (封印)
+    JewelryBox --> Dashboard: 暗号化鍵画像の保存
+
+    Dashboard --> Memorial: 記念ページの公開 (家族用)
+    Memorial --> [*]: 想いの継承
 ```
 
 ### ユーザー体験のポイント
