@@ -16,6 +16,9 @@ MONGO_URI=mongodb://root:example@mongodb:27017/amber_ink_db?authSource=admin
 # 共通設定
 APP_ID=amber-ink
 PORT=8080
+
+# 緊急通知のしきい値(日) - デフォルト3日
+EMERGENCY_THRESHOLD_DAYS=3
 ```
 
 ## 2. Frontend (.env)
@@ -31,8 +34,12 @@ VITE_GET_USER_DATA_URL=http://localhost:8085
 # Manual Delivery Triggers (プレゼン・テスト用)
 VITE_RUN_AI_ANALYZER_URL=http://localhost:8086
 VITE_RUN_DELIVERY_ENGINE_URL=http://localhost:8087
+VITE_RUN_EMERGENCY_MONITOR_URL=http://localhost:8090
 
 VITE_APP_ID=amber-ink
+
+# (バックエンド共通) 緊急通知のしきい値(日)
+EMERGENCY_THRESHOLD_DAYS=3
 ```
 
 ---

@@ -421,9 +421,9 @@ exports.deliveryEngine = async (targetUserId, targetOverride) => {
 };
 
 /**
- * 3. aiAnalyzer: AIアナライザー
+ * aiAnalyzer のコアロジック (内部用)
  */
-exports.aiAnalyzer = async (targetUserId) => {
+async function _aiAnalyzerCore(targetUserId) {
   const model = genAI.getGenerativeModel({
     model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     generationConfig: {
@@ -432,68 +432,136 @@ exports.aiAnalyzer = async (targetUserId) => {
     }
   });
 
-  try {
-    const database = await connectToDb();
-    const query = { status: 'active' };
-    if (targetUserId) {
-      query.userId = targetUserId;
-    }
-    const users = await database.collection('users').find(query).toArray();
-    console.log(`AI Analyzer: Processing ${users.length} users... (Target: ${targetUserId || 'ALL'})`);
-
-    for (const user of users) {
-      const prompt = `
-      You are the "Amber Ink" AI Content Architect.
-      Create a personalized greeting and short news snippets for ${user.name} based on their interests: "${user.interest}".
-      
-      [Guidelines for Multi-Interest Users]
-      - Split the user's interests by commas, spaces, or context (e.g., "テニス 料理" or "園芸、読書").
-      - For EACH distinct interest, create one separate "snippet".
-      - Snippets should be short (1-2 sentences) and include a brief interesting fact or warm thought related to that specific hobby.
-      - Do NOT mix different hobbies in a single snippet.
-      
-      Use their persona summary for tone: "${user.personaSummary || 'Friendly and calm'}".
-
-      [Goal]
-      1. Provide warm snippets that make them feel connected to their passions.
-      2. Encourage them to "check-in" to preserve their glow (Note: the check-in button is handled by the template).
-
-      [Output Format (JSON only)]
-      {
-        "snippets": [
-          { "topic": "Gardening", "text": "Something warm about plants..." },
-          { "topic": "Cooking", "text": "A small tip about seasonal ingredients..." }
-        ],
-        "scheduled_at": "ISO string for tomorrow morning around 8 AM"
-      }
-      
-      [Language]
-      RESPOND IN JAPANESE.
-      `;
-
-      const result = await model.generateContent(prompt);
-      const data = JSON.parse(cleanJson(result.response.text()));
-
-      await database.collection('users').updateOne(
-        { _id: user._id },
-        {
-          $set: {
-            scheduled_delivery: {
-              snippets: data.snippets,
-              at: new Date(data.scheduled_at),
-              sent: false
-            },
-            updatedAt: new Date()
-          }
-        }
-      );
-      console.log(`Generated content for ${user.name}`);
-    }
-    return { success: true, processed: users.length };
-  } catch (error) {
-    console.error('AI Analyzer Error:', error);
-    throw error;
+  const database = await connectToDb();
+  const query = { status: 'active' };
+  if (targetUserId) {
+    query.userId = targetUserId;
   }
+  const users = await database.collection('users').find(query).toArray();
+  console.log(`AI Analyzer Core: Processing ${users.length} users... (Target: ${targetUserId || 'ALL'})`);
+
+  for (const user of users) {
+    const prompt = `
+    You are the "Amber Ink" AI Content Architect.
+    Create a personalized greeting and short news snippets for ${user.name} based on their interests: "${user.interest}".
+    
+    [Guidelines for Multi-Interest Users]
+    - Split the user's interests by commas, spaces, or context (e.g., "テニス 料理" or "園芸、読書").
+    - For EACH distinct interest, create one separate "snippet".
+    - Snippets should be short (1-2 sentences) and include a brief interesting fact or warm thought related to that specific hobby.
+    - Do NOT mix different hobbies in a single snippet.
+    
+    Use their persona summary for tone: "${user.personaSummary || 'Friendly and calm'}".
+
+    [Goal]
+    1. Provide warm snippets that make them feel connected to their passions.
+    2. Encourage them to "check-in" to preserve their glow (Note: the check-in button is handled by the template).
+
+    [Output Format (JSON only)]
+    {
+      "snippets": [
+        { "topic": "Gardening", "text": "Something warm about plants..." },
+        { "topic": "Cooking", "text": "A small tip about seasonal ingredients..." }
+      ],
+      "scheduled_at": "2023-10-28T08:00:00.000+00:00"
+    }
+    
+    [Language]
+    RESPOND IN JAPANESE.
+    `;
+    // TODO: "scheduled_at" をちゃんと計算するようにする
+
+    const result = await model.generateContent(prompt);
+    const data = JSON.parse(cleanJson(result.response.text()));
+
+    await database.collection('users').updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          scheduled_delivery: {
+            snippets: data.snippets,
+            at: new Date(data.scheduled_at),
+            sent: false
+          },
+          updatedAt: new Date()
+        }
+      }
+    );
+    console.log(`Generated content for ${user.name}`);
+  }
+  return { success: true, processed: users.length };
+}
+
+/**
+ * 3. aiAnalyzer: AIアナライザー (HTTP)
+ */
+exports.aiAnalyzer = (req, res) => {
+  cors(req, res, async () => {
+    const { targetUserId } = req.body;
+    try {
+      const decodedToken = await verifyToken(req);
+      const adminToken = req.headers['x-amber-ink-admin-token'];
+      const isAdmin = (decodedToken.uid === 'admin') || (adminToken && adminToken === process.env.ADMIN_TOKEN);
+
+      if (!targetUserId && !isAdmin) {
+        return res.status(403).json({ error: 'Forbidden: Admin privilege required for bulk analysis' });
+      }
+
+      const result = await _aiAnalyzerCore(targetUserId);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('AI Analyzer API Error:', error);
+      res.status(error.message.includes('Unauthorized') ? 401 : 500).json({ error: error.message });
+    }
+  });
+};
+
+/**
+ * 7. runAiAnalyzer: AIアナライザー手動実行
+ */
+exports.runAiAnalyzer = (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyToken(req);
+      const adminToken = req.headers['x-amber-ink-admin-token'];
+      const isAdmin = (decodedToken.uid === 'admin') || (adminToken && adminToken === process.env.ADMIN_TOKEN);
+      const { userId } = req.body;
+
+      if (!userId && !isAdmin) {
+        return res.status(403).json({ error: 'Forbidden: Admin privilege required for bulk action' });
+      }
+
+      const result = await _aiAnalyzerCore(userId);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Run AI Analyzer Error:', error);
+      res.status(error.message.includes('Unauthorized') ? 401 : 500).json({ error: error.message });
+    }
+  });
+};
+
+/**
+ * 8. runDeliveryEngine: 配信エンジン手動実行
+ */
+exports.runDeliveryEngine = (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyToken(req);
+      const adminToken = req.headers['x-amber-ink-admin-token'];
+      const isAdmin = (decodedToken.uid === 'admin') || (adminToken && adminToken === process.env.ADMIN_TOKEN);
+      const { userId, targetOverride } = req.body;
+
+      if (!userId && !isAdmin) {
+        return res.status(403).json({ error: 'Forbidden: Admin privilege required for bulk action' });
+      }
+
+      const result = await exports.deliveryEngine(userId, targetOverride);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Run Delivery Engine Error:', error);
+      res.status(error.message.includes('Unauthorized') ? 401 : 500).json({ error: error.message });
+    }
+  });
 };
 
 /**
@@ -569,24 +637,29 @@ exports.getUserData = (req, res) => {
 
 /**
  * 4.5. emergencyMonitor: 放置ユーザーの緊急検知
+ * @param {string} targetUserId 特定ユーザーのみを対象とする場合
  */
-exports.emergencyMonitor = async () => {
+exports.emergencyMonitor = async (targetUserId) => {
   try {
     const database = await connectToDb();
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const thresholdDays = parseInt(process.env.EMERGENCY_THRESHOLD_DAYS || '3', 10);
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() - thresholdDays);
 
-    // 3日以上アクティビティがなく、かつステータスが active のユーザー
-    const users = await database.collection('users').find({
+    // X日以上アクティビティがなく、かつステータスが active のユーザー
+    const query = {
       status: 'active',
       emergency_notified: { $ne: true },
       $expr: {
         $lt: [
           { $arrayElemAt: ["$checkins", -1] },
-          threeDaysAgo.toISOString()
+          thresholdDate.toISOString()
         ]
       }
-    }, { projection: { checkins: { $slice: -20 } } }).toArray();
+    };
+    if (targetUserId) query.userId = targetUserId;
+
+    const users = await database.collection('users').find(query, { projection: { checkins: { $slice: -20 } } }).toArray();
 
     console.log(`Emergency Monitor: Found ${users.length} inactive users.`);
 
@@ -706,7 +779,7 @@ exports.checkIn = (req, res) => {
       }
 
       if (isRedirectRequest) {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
         return res.redirect(`${frontendUrl}/?uid=${userId}`);
       }
 
@@ -719,43 +792,17 @@ exports.checkIn = (req, res) => {
 };
 
 /**
- * 7. runAiAnalyzer: AIアナライザー手動実行 (デモ用)
- */
-exports.runAiAnalyzer = (req, res) => {
-  cors(req, res, async () => {
-    try {
-      const { userId } = req.body;
-      const result = await exports.aiAnalyzer(userId);
-      res.status(200).json(result);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-};
-
-/**
- * 8. runDeliveryEngine: 配信エンジン手動実行 (デモ用)
- */
-exports.runDeliveryEngine = (req, res) => {
-  cors(req, res, async () => {
-    try {
-      const { userId, targetOverride } = req.body;
-      const result = await exports.deliveryEngine(userId, targetOverride);
-      res.status(200).json(result);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-};
-
-/**
  * 9. runCompanionAgent: コンパニオン手動実行 (デモ用)
  */
 exports.runCompanionAgent = (req, res) => {
   cors(req, res, async () => {
     try {
-      const result = await exports.companionAgent(req, res);
-      // exports.companionAgent handles the response itself due to cors wrapper pattern
+      const { userId, message } = req.body;
+      const result = await exports.companionAgent({ body: { userId, message } }, {
+        status: () => ({ json: (data) => data }),
+        json: (data) => data
+      });
+      res.status(200).json(result);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -768,10 +815,25 @@ exports.runCompanionAgent = (req, res) => {
 exports.runEmergencyMonitor = (req, res) => {
   cors(req, res, async () => {
     try {
-      const result = await exports.emergencyMonitor();
+      const decodedToken = await verifyToken(req);
+      const adminToken = req.headers['x-amber-ink-admin-token'];
+      const isAdmin = (decodedToken.uid === 'admin') || (adminToken && adminToken === process.env.ADMIN_TOKEN);
+      const { userId } = req.body;
+
+      if (!isAdmin) {
+        return res.status(403).json({ error: 'Forbidden: Admin privilege required' });
+      }
+
+      // UI側で空チェックをしている前提だが、念のためサーバー側でもバリデーション
+      if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+      }
+
+      const result = await exports.emergencyMonitor(userId);
       res.status(200).json(result);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      console.error('Run Emergency Monitor Error:', error);
+      res.status(error.message.includes('Unauthorized') ? 401 : 500).json({ error: error.message });
     }
   });
 };

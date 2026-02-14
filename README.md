@@ -34,6 +34,15 @@ podman compose up --build
 - **Frontend**: [http://localhost:5173](http://localhost:5173)
 - **MongoDB**: [localhost:27017]
 
+## 🛠 管理機能 (管理者用)
+
+システム管理者向けのデバッグ・運用管理用ダッシュボードが用意されています。
+
+- **URL**: [http://localhost:5173/?view=admin](http://localhost:5173/?view=admin)
+- **機能**: 
+  - 特定ユーザーまたは全員を対象としたAI配信コンテンツの生成（runAiAnalyzer）
+  - 配信スケジュールの強制実行（runDeliveryEngine）
+
 ## 📄 ドキュメント一覧
 - [SYSTEM_SUMMARY.md](./SYSTEM_SUMMARY.md): 中間発表用システム概要・遷移図
 - [ARCHITECTURE.md](./ARCHITECTURE.md): 技術構成・データフロー詳細

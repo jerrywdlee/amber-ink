@@ -5,6 +5,7 @@ import { DashboardView } from './components/DashboardView';
 import { CompanionChatView } from './components/CompanionChatView';
 import { EmergencyStatusView } from './components/EmergencyStatusView';
 import { JewelryBoxView } from './components/JewelryBoxView';
+import { AdminView } from './components/AdminView';
 import { LoadingScreen } from './components/LoadingScreen';
 import { delay } from './utils/helpers';
 
@@ -80,6 +81,7 @@ export default function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const uidFromUrl = urlParams.get('uid');
     const viewMode = urlParams.get('view');
+    console.log('[DEBUG] Initial Hydration:', { uidFromUrl, viewMode, currentUserId: userId });
 
     const fetchUserData = async (id, isEmergency = false, auto = false) => {
       if (!id) return;
@@ -118,6 +120,15 @@ export default function App() {
       }
     };
 
+    if (viewMode === 'admin') {
+      console.log('Admin View mode detected');
+      routeProcessed.current = true;
+      setMode('admin');
+      // URLを消さないように変更（管理者がリロードしやすくするため）
+      setIsLoading(false);
+      return;
+    }
+
     if (viewMode === 'emergency' && uidFromUrl) {
       console.log('Emergency View mode detected for UID:', uidFromUrl);
       routeProcessed.current = true;
@@ -128,11 +139,23 @@ export default function App() {
     }
 
     if (uidFromUrl && uidFromUrl !== userId) {
-      console.log('Detecting UID from URL (Internal login):', uidFromUrl);
+      console.log('Detecting UID from URL (Forced login/overwrite):', uidFromUrl);
       routeProcessed.current = true;
+
+      // 他人のユーザーIDで上書きする場合は履歴をクリア
+      if (userId && userId !== uidFromUrl) {
+        localStorage.removeItem(`amber_ink_chat_${userId}`);
+        localStorage.removeItem(`amber_ink_companion_chat_${userId}`);
+        setChatMessages([]);
+        setCompanionMessages([]);
+      }
+
       localStorage.setItem('amber_ink_userId', uidFromUrl);
       setUserId(uidFromUrl);
-      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // SecurityError対策: パスが // で始まると別ドメイン(プロトコル相対URL)と見なされるため、単一の / に正規化
+      const cleanPath = '/' + window.location.pathname.replace(/^\/+/, '');
+      window.history.replaceState({}, document.title, cleanPath);
       return;
     }
 
@@ -459,13 +482,15 @@ export default function App() {
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl" />
       <div className="absolute top-1/2 -left-20 w-48 h-48 bg-orange-400/20 rounded-full blur-3xl" />
 
-      {/* 隔離設計：緊急ビューではヘッダー（メニュー等）を表示しない */}
-      {mode !== 'emergency' && (
+      {/* 隔離設計：緊急ビューまたは管理ビューではヘッダー（メニュー等）を表示しない */}
+      {mode !== 'emergency' && mode !== 'admin' && (
         <AppHeader mode={mode} regType={regType} setRegType={setRegType} setMode={setMode} />
       )}
 
       {mode === 'emergency' ? (
         <EmergencyStatusView userId={userId} userData={userData} />
+      ) : mode === 'admin' ? (
+        <AdminView userId={userId} />
       ) : mode === 'registration' ? (
         <RegistrationView
           regType={regType} chatMessages={chatMessages} isTyping={isTyping}

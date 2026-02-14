@@ -19,15 +19,16 @@ class EmailStrategy extends BaseDeliveryStrategy {
 
   async send(user, deliveryData) {
     const { targetOverride, type = 'daily' } = deliveryData;
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const checkInUrl = `${process.env.BASE_FUNCTION_URL || 'http://localhost:8080'}/checkIn?uid=${user.userId}`;
+    const baseFunctionUrl = (process.env.BASE_FUNCTION_URL || 'http://localhost:8080').replace(/\/$/, '');
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const checkInUrl = `${baseFunctionUrl}/checkIn?uid=${user.userId}`;
 
     let recipient = user.contact;
     let templateDir = 'daily';
     let templateData = {
       name: user.name,
       checkInUrl: checkInUrl,
-      familySupportUrl: `${baseUrl}/?view=emergency&uid=${user.userId}`
+      familySupportUrl: `${frontendUrl}/?view=emergency&uid=${user.userId}`
     };
 
     // Determine recipient and template based on type and override
@@ -40,6 +41,7 @@ class EmailStrategy extends BaseDeliveryStrategy {
       const lastSeen = new Date(lastCheckinStr);
       const daysMissing = Math.floor((new Date() - lastSeen) / (1000 * 60 * 60 * 24));
       templateData.days_missing = daysMissing || 1;
+      templateData.target_label = '見守りサポーター';
     }
 
     if (targetOverride) {
