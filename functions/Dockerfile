@@ -19,5 +19,4 @@ COPY . .
 ENV FUNCTION_TARGET=onboardingAgent
 
 # Run the web service on container startup.
-# The functions-framework listens on port 8080 by default.
-CMD exec npx @google-cloud/functions-framework --target=$FUNCTION_TARGET
+CMD ["node", "server.js"]
