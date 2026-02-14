@@ -57,7 +57,7 @@ export const CompanionChatView = ({
                     {isMenuOpen ? <X size={16} /> : <Plus size={18} />}
                 </button>
 
-                <div className={`flex items-center gap-2 overflow-hidden transition-all duration-500 ease-in-out ${isMenuOpen ? 'max-w-xs opacity-100 translate-x-0' : 'max-w-0 opacity-0 -translate-x-4 pointer-events-none'}`}>
+                <div className={`flex items-center gap-2 overflow-hidden transition-all duration-500 ease-in-out ${isMenuOpen ? 'max-w-md opacity-100 translate-x-0' : 'max-w-0 opacity-0 -translate-x-4 pointer-events-none'}`}>
                     <button
                         onClick={clearCompanionHistory}
                         className="px-3 py-1.5 bg-red-500/10 backdrop-blur-md border border-red-500/20 rounded-full text-[10px] font-bold text-red-700 shadow-xs active:scale-95 transition-transform flex items-center gap-1 whitespace-nowrap"
@@ -79,14 +79,24 @@ export const CompanionChatView = ({
                         <User size={10} />
                         プロフィール
                     </button>
+                    {companionSuggestions.length > 0 && (
+                        <button
+                            onClick={() => handleSendCompanionMessage("前回届いた配信の内容を教えて")}
+                            className="px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform whitespace-nowrap"
+                        >
+                            前回の配信
+                        </button>
+                    )}
                 </div>
 
-                <button
-                    onClick={() => handleSendCompanionMessage("前回届いた配信の内容を教えて")}
-                    className="px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform"
-                >
-                    前回の配信
-                </button>
+                {companionSuggestions.length === 0 && (
+                    <button
+                        onClick={() => handleSendCompanionMessage("前回届いた配信の内容を教えて")}
+                        className="px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform whitespace-nowrap"
+                    >
+                        前回の配信
+                    </button>
+                )}
                 {companionSuggestions.map((s, i) => (
                     <button
                         key={i}

@@ -21,7 +21,7 @@ class EmailStrategy extends BaseDeliveryStrategy {
     const { targetOverride, type = 'daily' } = deliveryData;
     const baseFunctionUrl = (process.env.BASE_FUNCTION_URL || 'http://localhost:8080').replace(/\/$/, '');
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-    const checkInUrl = `${baseFunctionUrl}/checkIn?uid=${user.userId}`;
+    const checkInUrl = `${frontendUrl}/?uid=${user.userId}&view=chat&autochat=1`;
 
     let recipient = user.contact;
     let templateDir = 'daily';

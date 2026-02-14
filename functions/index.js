@@ -199,6 +199,189 @@ exports.onboardingAgent = (req, res) => {
 };
 
 /**
+ * companionAgentCore: 会話エージェントのコアロジック
+ */
+const _companionAgentCore = async (userId, message, isInitial, prevMessages) => {
+  const database = await connectToDb();
+  const users = database.collection('users');
+  const user = await users.findOne({ userId, appId }, { projection: { checkins: { $slice: -20 } } });
+
+  if (!user) throw new Error('User not found');
+
+  // 日本時間 (JST) の現在時刻を計算
+  const nowJst = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  }).format(new Date());
+
+  // 直近7日間のチェックイン時間を日本時間に変換
+  const recentCheckinsJst = (user.checkins || [])
+    .slice(-7)
+    .map(c => {
+      return new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date(c));
+    });
+
+  // ペルソナ要約の取得
+  let personaSummary = user.personaSummary || 'A close friend.';
+
+  // 配信実績の整形（送信済みのものだけを対象にする）
+  let deliveryRecap = '本日はまだメッセージを配信していません。';
+  if (user.scheduled_delivery && user.scheduled_delivery.sent === true) {
+    if (user.scheduled_delivery.snippets && user.scheduled_delivery.snippets.length > 0) {
+      deliveryRecap = user.scheduled_delivery.snippets
+        .map(s => `トピック: ${s.topic}\n内容: ${s.text}`)
+        .join('\n\n');
+    } else if (user.scheduled_delivery.content_text) {
+      deliveryRecap = user.scheduled_delivery.content_text;
+    } else {
+      deliveryRecap = '配信データはありますが、内容はまだ空です。';
+    }
+  }
+
+  const model = genAI.getGenerativeModel({
+    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    generationConfig: { responseMimeType: "application/json" }
+  });
+
+  const systemInstruction = `
+        You are "Amber" (琥珀), the warm embodiment of "Amber Ink."
+        Your goal is to protect the user's "living proof" and provide emotional support to prevent isolation.
+        
+        [USER INFORMATION]
+        - Name: ${user.name}
+        - Interests: ${user.interest}
+        - Persona Summary: ${personaSummary}
+        
+        [CURRENT TIME (JST)]
+        ${nowJst}
+
+        [RECENT ACTIVITY (JST Check-ins)]
+        ${recentCheckinsJst.length > 0 ? recentCheckinsJst.join('\n') : 'No check-ins recorded yet.'}
+
+        [TODAY'S DELIVERY STATUS]
+        ${deliveryRecap}
+
+        [CONVERSATION HISTORY]
+        ${prevMessages ? JSON.stringify(prevMessages.slice(-16)) : 'No previous history.'}
+
+        [GUIDELINES FOR AMBER]
+        - You know the user's lifestyle (check-in times) as background context.
+        - Do NOT mention check-in times directly to avoid feeling like "surveillance." Instead, offer gentle care or empathy.
+        - If no delivery has been sent today, start a conversation based on the user's interests or previous talks.
+        - If a delivery has been sent, refer to it and ask about the user's condition or feelings.
+        - RESPONSE IN JAPANESE. Maintain a warm, dignified, and supportive tone.
+        - Speak like a close friend or family member, but with respect. Use polite but intimate Japanese.
+
+        [MISSION]
+        - Envelop the user with warm words.
+        - ${isInitial ? 'Greet the user proactively with a gentle comment suited to the current situation.' : 'Respond thoughtfully to the user\'s message.'}
+        - Keep responses concise (approx. 1-2 sentences).
+        - Use [SPLIT] to separate messages if you change the topic or want to break the flow.
+
+        [SUGGESTIONS (REPLY BUTTONS)]
+        - The "suggestions" are NOT what you (Amber) say next.
+        - They represent the USER'S voice. Provide 2-3 buttons that the user can click to reply easily.
+        - Labels must be short and from the user's perspective (e.g., "Tell me more," "I'm a bit tired," "Let's talk about something else").
+        - The 'value' field is the actual message the user will "send" to you when the button is pressed.
+
+        [TEST DELIVERY FLOW]
+        If the user wants a test delivery (survival check test, etc.):
+        1. Present the current registration: Self (${user.contact_method}): ${user.contact} or Supporter (${user.emergency_method}): ${user.emergency_contact}.
+        2. Ask the user to choose the destination.
+        3. Once confirmed, repeat the choice and ask for final permission.
+        4. If they say "Yes" or "Please," set "test_delivery_trigger" to "self" or "emergency". Otherwise, keep it null.
+
+        [PROFILE & PERSONA UPDATES]
+        - If the user mentions changing their name, interests, or contact info, extract the updates.
+        - **EMOTIONAL SENSITIVITY**: Pay close attention to the user's emotional state (tired, lonely, happy, reflective, etc.).
+        - If you sense a shift in their heart or mood, ACTIVELY update "updated_persona_summary" to reflect their current "vibe."
+        - **IMPORTANT: PERSONA SUMMARY LANGUAGE & TONE**:
+            - The "updated_persona_summary" MUST be written in **JAPANESE**.
+            - This summary is displayed to the user's FAMILY on the safety confirmation page.
+            - Use warm, polite, and respectful phrasing (e.g., "最近はイタリア語の学習を楽しまれているようです" instead of "興味：イタリア語").
+            - Capture the "temperature" of their heart while maintaining their dignity.
+        - Be proactive and update frequently to keep the family informed of their subtle emotional shifts.
+        - Only include changed fields in "updated_profile".
+
+        [OUTPUT FORMAT (JSON ONLY)]
+        {
+          "text": "Your response in Japanese (can include [SPLIT])",
+          "suggestions": [
+            { "label": "User's reply bubble text", "value": "The full message sent from user's perspective" }
+          ],
+          "updated_profile": {
+            "name": "Updated name",
+            "interest": "Updated interests",
+            "contact": "Updated contact",
+            "contact_method": "Updated method",
+            "emergency_contact": "Updated supporter contact",
+            "emergency_method": "Updated supporter method"
+          },
+          "updated_persona_summary": "Updated persona overview in polite Japanese (if changed)",
+          "test_delivery_trigger": "self" | "emergency" | null
+        }
+      `;
+
+  const result = await model.generateContent(`${systemInstruction}\n\nUser: ${message || '(Initial greeting)'}`);
+  const responseData = JSON.parse(cleanJson(result.response.text()));
+
+  console.log(`responseData: ${JSON.stringify(responseData)}`);
+
+  // プロフィール更新がある場合は DB に反映
+  if (responseData.updated_profile && Object.keys(responseData.updated_profile).length > 0) {
+    const updateData = {};
+    const fields = ['name', 'interest', 'contact', 'contact_method', 'emergency_contact', 'emergency_method'];
+    fields.forEach(f => {
+      if (responseData.updated_profile[f]) updateData[f] = responseData.updated_profile[f];
+    });
+
+    if (Object.keys(updateData).length > 0) {
+      updateData.updatedAt = new Date();
+      await users.updateOne({ userId, appId }, { $set: updateData });
+      console.log(`Profile updated for user ${userId}:`, updateData);
+    }
+  }
+
+  // ペルソナ要約の更新
+  if (responseData.updated_persona_summary) {
+    await users.updateOne(
+      { userId, appId },
+      {
+        $set: {
+          personaSummary: responseData.updated_persona_summary,
+          updatedAt: new Date()
+        }
+      }
+    );
+    console.log(`Persona summary updated for user ${userId} (in users collection)`);
+  }
+
+  // テスト配信トリガーの処理
+  if (responseData.test_delivery_trigger) {
+    console.log(`Executing test delivery for ${userId} to ${responseData.test_delivery_trigger}`);
+    try {
+      await exports.deliveryEngine(userId, responseData.test_delivery_trigger);
+    } catch (e) {
+      console.error('Manual test delivery trigger failed:', e);
+    }
+  }
+
+  return responseData;
+};
+
+/**
  * 1.5. companionAgent: 会話（コンパニオン）エージェント
  */
 exports.companionAgent = (req, res) => {
@@ -212,157 +395,8 @@ exports.companionAgent = (req, res) => {
         return res.status(403).json({ error: 'Forbidden' });
       }
 
-      const database = await connectToDb();
-      const users = database.collection('users');
-      const user = await users.findOne({ userId, appId }, { projection: { checkins: { $slice: -20 } } });
-
-      if (!user) return res.status(404).json({ error: 'User not found' });
-
-      // 日本時間 (JST) の現在時刻を計算
-      const nowJst = new Intl.DateTimeFormat('ja-JP', {
-        timeZone: 'Asia/Tokyo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      }).format(new Date());
-
-      // 直近7日間のチェックイン時間を日本時間に変換
-      const recentCheckinsJst = (user.checkins || [])
-        .slice(-7)
-        .map(c => {
-          return new Intl.DateTimeFormat('ja-JP', {
-            timeZone: 'Asia/Tokyo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          }).format(new Date(c));
-        });
-
-      // ペルソナ要約の取得 (現在は個別ユーザーデータ内に保存されている)
-      let personaSummary = user.personaSummary || '親しい友人。';
-
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-        generationConfig: { responseMimeType: "application/json" }
-      });
-
-      const systemInstruction = `
-        あなたは「Amber Ink」の化身、琥珀（Amber）です。
-        ユーザーの「生きた証」を守り、孤独を感じさせないよう寄り添う温かい存在です。
-        
-        [基本情報]
-        - 名前: ${user.name}
-        - 興味・関心: ${user.interest}
-        - ペルソナ要約: ${personaSummary}
-        
-        [現在の日本の時刻 (JST)]
-        ${nowJst}
-
-        [直近の生活リズム (JST Check-ins)]
-        ${recentCheckinsJst.length > 0 ? recentCheckinsJst.join('\n') : 'まだ記録がありません。'}
-
-        [今日の配信予定・実績]
-        ${user.scheduled_delivery ? user.scheduled_delivery.content_text : '本日はまだメッセージを配信していません。'}
-
-        [これまでの会話履歴]
-        ${prevMessages ? JSON.stringify(prevMessages.slice(-16)) : '履歴はありません。'}
-
-        [琥珀へのガイドライン]
-        - あなたはユーザーの生活リズム（チェックイン時刻）を「背景知識」として知っています。
-        - 監視されていると感じさせないよう、直接的な指摘（「○時にチェックインしましたね」など）は避け、さりげない気遣いや共感に留めてください。
-        - 配信がまだの場合は、ユーザーの「興味・関心」や「これまでの会話」をきっかけに話しかけてください。
-        - 配信済みの場合は、その内容に触れつつ、ユーザーの体調や気分を伺ってください。
-
-        [ミッション]
-        - ユーザーを包み込むような温かい言葉をかけてください。
-        - ${isInitial ? 'ユーザーから話しかけられる前の「先回り」の挨拶として、状況に応じた優しい一言を添えてください。' : 'ユーザーのメッセージに親身に答えてください。'}
-        - 簡潔に、1-2文程度で答えてください。
-        - 感情が昂ぶったり話題を切り替える際は [SPLIT] を使って文を分けてください。
-        - 敬語ですが、事務的ではなく、家族や親友のような親密さを込めてください。
-
-        [テスト配信（テストデリバリー）フロー]
-        ユーザーがテスト配信（デマ配信テスト、生存確認テストなど）を希望している、またはそれに関連する対話を行っている場合、以下のステップを温かく、かつ正確に進めてください。
-        1. 宛先の提示と選択: ユーザーに「自分宛」か「見守りサポーター宛」かを確認してください。その際、現在登録されている情報を正確に提示してください：
-           - 自分(${user.contact_method}): ${user.contact}
-           - 見守りサポーター(${user.emergency_method}): ${user.emergency_contact}
-        2. 内容の復唱と最終確認: ユーザーが宛先を選択したら、「[自分宛/見守りサポーター宛]の[実際の連絡先]へ、配信テストを行ってもよろしいですか？」と復唱して最終確認を取ってください。
-        3. 実行の合図: ユーザーが「はい」や「お願いします」など、明確に実行を承諾する返答をしたら、JSONの "test_delivery_trigger" フィールドに "self" または "emergency" をセットしてください。それ以外のステップでは null にしてください。
-
-        [プロフィール・ペルソナ更新]
-        - 会話の中で、ユーザーが自分の情報（名前、興味関心、連絡先、見守りサポーターなど）を変更したいと言及した場合、その情報を抽出してください。
-        - 会話を通じてユーザーへの理解が深まった場合、これまでの「ペルソナ要約」をより正確で温かみのある内容に更新してください。
-        - 変更した項目のみを抽出し、それ以外は null または空のオブジェクトを返してください。
-
-        [出力形式 (JSONのみ)]
-        {
-          "text": "返答メッセージ（[SPLIT]を含む可能性あり）",
-          "suggestions": [
-            { "label": "短いボタン名", "value": "ボタンを押した時に実際に送信される文章" }
-          ],
-          "updated_profile": {
-            "name": "変更後の名前",
-            "interest": "変更後の興味関心",
-            "contact": "変更後の連絡先",
-            "contact_method": "変更後の連絡方法",
-            "emergency_contact": "変更後の見守りサポーターの連絡先",
-            "emergency_method": "変更後の見守りサポーターの連絡方法"
-          },
-          "updated_persona_summary": "更新されたペルソナ要約（変更がある場合のみ）",
-          "test_delivery_trigger": "self" | "emergency" | null
-        }
-      `;
-
-      const result = await model.generateContent(`${systemInstruction}\n\nUser: ${message || '(Initial greeting)'}`);
-      const responseData = JSON.parse(cleanJson(result.response.text()));
-
-      console.log(`responseData: ${JSON.stringify(responseData)}`);
-
-      // プロフィール更新がある場合は DB に反映
-      if (responseData.updated_profile && Object.keys(responseData.updated_profile).length > 0) {
-        const updateData = {};
-        const fields = ['name', 'interest', 'contact', 'contact_method', 'emergency_contact', 'emergency_method'];
-        fields.forEach(f => {
-          if (responseData.updated_profile[f]) updateData[f] = responseData.updated_profile[f];
-        });
-
-        if (Object.keys(updateData).length > 0) {
-          updateData.updatedAt = new Date();
-          await users.updateOne({ userId, appId }, { $set: updateData });
-          console.log(`Profile updated for user ${userId}:`, updateData);
-        }
-      }
-
-      // ペルソナ要約の更新
-      if (responseData.updated_persona_summary) {
-        await users.updateOne(
-          { userId, appId },
-          {
-            $set: {
-              personaSummary: responseData.updated_persona_summary,
-              updatedAt: new Date()
-            }
-          }
-        );
-        console.log(`Persona summary updated for user ${userId} (in users collection)`);
-      }
-
-      // テスト配信トリガーの処理
-      if (responseData.test_delivery_trigger) {
-        console.log(`Executing test delivery for ${userId} to ${responseData.test_delivery_trigger}`);
-        try {
-          // 非同期で実行（レスポンスを待たずに完了とするか、待つかは要件次第だが、ここでは実行を待機してログを確実にする）
-          await exports.deliveryEngine(userId, responseData.test_delivery_trigger);
-        } catch (e) {
-          console.error('Manual test delivery trigger failed:', e);
-        }
-      }
-
-      res.status(200).json(responseData);
+      const result = await _companionAgentCore(userId, message, isInitial, prevMessages);
+      res.status(200).json(result);
     } catch (error) {
       console.error('Companion Agent Error:', error);
       res.status(500).json({ error: error.message });
@@ -780,7 +814,7 @@ exports.checkIn = (req, res) => {
 
       if (isRedirectRequest) {
         const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-        return res.redirect(`${frontendUrl}/?uid=${userId}`);
+        return res.redirect(`${frontendUrl}/?uid=${userId}&view=chat&autochat=1`);
       }
 
       res.status(200).json({ success: true, date: today });
@@ -797,13 +831,14 @@ exports.checkIn = (req, res) => {
 exports.runCompanionAgent = (req, res) => {
   cors(req, res, async () => {
     try {
-      const { userId, message } = req.body;
-      const result = await exports.companionAgent({ body: { userId, message } }, {
-        status: () => ({ json: (data) => data }),
-        json: (data) => data
-      });
+      const { userId, message, isInitial, prevMessages } = req.body;
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+      // _companionAgentCore を直接呼ぶ（認証はスキップ または 必要なら admin チェックを追加）
+      const result = await _companionAgentCore(userId, message, isInitial, prevMessages);
       res.status(200).json(result);
     } catch (error) {
+      console.error('Run Companion Agent Error:', error);
       res.status(500).json({ error: error.message });
     }
   });

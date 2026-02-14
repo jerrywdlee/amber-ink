@@ -73,6 +73,7 @@ export default function App() {
   const companionChatEndRef = useRef(null);
 
   const routeProcessed = useRef(false);
+  const autoChatTriggerPending = useRef(false);
 
   // 初回データ読込
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const uidFromUrl = urlParams.get('uid');
     const viewMode = urlParams.get('view');
+    const autoChat = urlParams.get('autochat');
     console.log('[DEBUG] Initial Hydration:', { uidFromUrl, viewMode, currentUserId: userId });
 
     const fetchUserData = async (id, isEmergency = false, auto = false) => {
@@ -108,6 +110,11 @@ export default function App() {
             if (isEmergency) {
               setMode('emergency');
               console.log('Mode set to emergency');
+            } else if (viewMode === 'chat') {
+              setMode('companion');
+              if (autoChat === '1') {
+                autoChatTriggerPending.current = true;
+              }
             } else {
               if (mode === 'registration') setMode('dashboard');
             }
@@ -138,8 +145,8 @@ export default function App() {
       return;
     }
 
-    if (uidFromUrl && uidFromUrl !== userId) {
-      console.log('Detecting UID from URL (Forced login/overwrite):', uidFromUrl);
+    if (uidFromUrl) {
+      console.log('Detecting UID from URL:', uidFromUrl);
       routeProcessed.current = true;
 
       // 他人のユーザーIDで上書きする場合は履歴をクリア
@@ -153,8 +160,12 @@ export default function App() {
       localStorage.setItem('amber_ink_userId', uidFromUrl);
       setUserId(uidFromUrl);
 
+      // 既に userId が一致している場合でも、最新データを取得しチェックインを発生させる
+      fetchUserData(uidFromUrl, false, true);
+
       // SecurityError対策: パスが // で始まると別ドメイン(プロトコル相対URL)と見なされるため、単一の / に正規化
-      const cleanPath = '/' + window.location.pathname.replace(/^\/+/, '');
+      // また、ユーザーが直打ちする可能性のある /checkIn パスもルートに正規化する
+      const cleanPath = '/' + window.location.pathname.replace(/^\/+/, '').replace(/^checkIn\/?/, '');
       window.history.replaceState({}, document.title, cleanPath);
       return;
     }
@@ -166,6 +177,15 @@ export default function App() {
       setIsLoading(false);
     }
   }, [userId]);
+
+  // Handle Automatic Chat Trigger
+  useEffect(() => {
+    if (mode === 'companion' && userData && autoChatTriggerPending.current && !isTypingCompanion) {
+      autoChatTriggerPending.current = false;
+      console.log('[AUTO-CHAT] Triggering previous delivery recap...');
+      handleSendCompanionMessage("前回届いた配信の内容を教えて");
+    }
+  }, [mode, userData, isTypingCompanion]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
