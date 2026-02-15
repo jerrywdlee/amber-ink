@@ -16,9 +16,10 @@ graph TD
     subgraph "Frontend (React + Vite)"
         UI[UI Components]
         LocalDB[(localStorage)]
+        Crypto[(WebCryptoAPI)]
     end
     
-    subgraph "Backend (Google Cloud Functions)"
+    subgraph "Backend (Serverless)"
         OnboardingAgent[onboardingAgent]
         CheckIn[checkIn API]
         DataMgr[registerUser API]
@@ -33,20 +34,29 @@ graph TD
         MongoDB[(MongoDB)]
     end
 
-    User <-->|HTTP/JSON| UI
+    User <-->|チャット| UI
     UI <-->|API Calls| OnboardingAgent
     UI <-->|API Calls| CheckIn
     UI <-->|API Calls| DataMgr
+    UI <-->|API Calls| Companion
     
     OnboardingAgent <-->|Context/Persona| Gemini
     OnboardingAgent <-->|Read/Write| MongoDB
     
-    AIAnalyzer -->|Analyze| MongoDB
+    Companion <-->|Read/Write| MongoDB
+    Companion <-->|Context/Persona| Gemini
+
+    AIAnalyzer -->|定期走査| MongoDB
     AIAnalyzer <--> Gemini
+
+
     
-    Delivery -->|Process| MongoDB
+    Delivery -->|定期走査| MongoDB
+
+    Emergency -->|定期走査| MongoDB
     
-    UI --- LocalDB
+    UI --- |会話履歴| LocalDB
+    UI --- |暗号化| Crypto
 ```
 
 ### 主要技術スタック
