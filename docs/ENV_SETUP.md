@@ -58,8 +58,10 @@ Cloud Run へのデプロイ詳細は [DEPLOYMENT_GUIDE_CLOUDRUN.md](./DEPLOYMEN
 ## 3. セットアップ手順
 
 1. **API キーの取得**: [Google AI Studio](https://aistudio.google.com/) で Gemini API キーを発行。
-2. **ファイルのコピー**: プロジェクトルートの `.env.example` を `.env` にリネーム。フロントエンド用は `frontend/.env.example` を `frontend/.env` に。
-3. **変数の編集**: ルートの `.env` 内のキーやトークン、接続文字列を編集。
+2. **ファイルのコピー**: 
+    - ローカル用: プロジェクトルートの `.env.example` を `.env` にリネーム。
+    - Cloud Run用: プロジェクトルートの `env.example.yaml` を `env.yaml` にリネーム（任意ですが推奨）。
+3. **変数の編集**: 各ファイル内のキーやトークン、接続文字列を編集。
 
 ## 4. アーキテクチャの切り替え (Architecture Switching)
 

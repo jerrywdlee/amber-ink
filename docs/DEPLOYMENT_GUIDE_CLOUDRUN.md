@@ -22,29 +22,35 @@ cd functions
 # デプロイコマンド
 gcloud run deploy amber-ink-backend \
   --source . \
+  --env-vars-file ../env.yaml \
+  --project [YOUR_PROJECT_ID] \
   --platform managed \
   --region asia-northeast1 \
-  --allow-unauthenticated \
-  --set-env-vars "MONGODB_URI=mongodb+srv://[USER]:[PASS]@[CLUSTER].mongodb.net/[DB_NAME]?retryWrites=true&w=majority" \
-  --set-env-vars "GEMINI_API_KEY=[YOUR_KEY]" \
-  --set-env-vars "ADMIN_TOKEN=[YOUR_TOKEN]" \
-  --set-env-vars "APP_ID=amber-ink" \
-  --set-env-vars "EMERGENCY_THRESHOLD_DAYS=3"
+  --allow-unauthenticated
 ```
-
-> [!TIP]
-> `--source .` を使用すると、Google Cloud Build が背後でイメージ作成を行い、Artifact Registry へのプッシュも自動的に完結します。
 
 ---
 
-## 3. 環境変数の管理
+## 3. 環境変数の管理 (Environment via YAML)
 
-デプロイ後は、Google Cloud コンソールの「新しいリビジョンの編集とデプロイ」メニューから環境変数を安全に編集・管理できます。
+Cloud Run への環境変数設定は、プロジェクトルートにある **`env.yaml`** を使用することを推奨します。
 
-### 重要な変数
-- **MONGODB_URI**: MongoDB Atlas の接続文字列（`mongodb+srv://...`）を使用します。
-- **BASE_FUNCTION_URL**: デプロイ成功後に発行される URL
-- **FRONTEND_URL**: フロントエンドが公開されている URL（CORS 許可に必要）
+1.  ルートディレクトリに移動します。
+2.  `env.example.yaml` を `env.yaml` としてコピーします。
+3.  `env.yaml` 内の値を適切な本番環境設定（MongoDB Atlas の URI など）に書き換えます。
+4.  デプロイコマンド（上述）を実行すると、ファイルの内容が自動的に Cloud Run に反映されます。
+
+> [!IMPORTANT]
+> `env.yaml` は秘密情報を含むため、絶対に変更をコミットしないでください（`.gitignore` で除外済みです）。
+> 
+> **YAML形式の注意点**:
+> Cloud Run の環境変数はすべて「文字列」である必要があります。`SMTP_PORT: "587"` や `EMERGENCY_THRESHOLD_DAYS: "3"` のように、**数値であっても必ずダブルクォーテーションで囲んでください**。囲まない場合、デプロイ時にエラーが発生します。
+
+> [!TIP]
+> もし `--env-vars-file` がお使いの環境でエラーになる場合は、従来の `--set-env-vars` で直接指定してください：
+> ```bash
+> gcloud run deploy amber-ink-backend --source . --set-env-vars GEMINI_API_KEY=xxx,MONGODB_URI=xxx...
+> ```
 
 ---
 
