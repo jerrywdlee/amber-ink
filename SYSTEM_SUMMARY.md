@@ -1,4 +1,4 @@
-# Amber Ink - システム構成・画面遷移図（中間発表用）
+# Amber Ink - システム構成・画面遷移図
 
 「琥珀（Amber）」に刻む、永遠の「インク（Ink）」。
 孤独孤立を防ぎ、個人の「生きた証」を保護するオンボーディング・パーソナルアシスタント。
@@ -7,7 +7,7 @@
 
 ## 1. システム構成図 (System Architecture)
 
-バックエンドは Google Cloud Functions (Node.js) をベースとし、生成 AI (Gemini API) と NoSQL (MongoDB) を連携させたマイクロサービス構成です。
+バックエンドは Google Cloud Functions / Node.js をベースとし、生成 AI (Gemini API) と NoSQL (MongoDB Atlas) を連携させたマイクロサービス構成です。
 
 ```mermaid
 graph TD
@@ -19,7 +19,7 @@ graph TD
         Crypto[(WebCryptoAPI)]
     end
     
-    subgraph "Backend (Serverless)"
+    subgraph "Backend (Production)"
         OnboardingAgent[onboardingAgent]
         CheckIn[checkIn API]
         DataMgr[registerUser API]
@@ -31,7 +31,7 @@ graph TD
     
     subgraph "External & Storage"
         Gemini[[Google Gemini API]]
-        MongoDB[(MongoDB)]
+        MongoDB[(MongoDB Atlas)]
     end
 
     User <-->|チャット| UI
@@ -48,8 +48,6 @@ graph TD
 
     AIAnalyzer -->|定期走査| MongoDB
     AIAnalyzer <--> Gemini
-
-
     
     Delivery -->|定期走査| MongoDB
 
@@ -60,59 +58,88 @@ graph TD
 ```
 
 ### 主要技術スタック
-- **Frontend**: React, Tailwind CSS, Lucide-React
-- **Backend**: Node.js, Google Cloud Functions Framework
-- **AI**: Google Gemini 2.5-flash (モデル可変)
-- **Database**: MongoDB (Session & Persona Storage)
-- **Environment**: Podman / Docker Compose (Local Dev)
+- **Frontend**: React, Tailwind CSS, Web Crypto API
+- **Backend**: Node.js, Google Cloud Functions
+- **AI**: Google Gemini 2.5-flash
+- **Database**: MongoDB Atlas
+- **Hosting**: GitHub Pages (Front) / Cloud Run (Back)
 
 ---
 
 ## 2. 画面遷移・動線 (Screen Transition Flow)
 
-ユーザーは「対話」を通じて自然に登録を終え、日々の「宝石（チェックイン）」を積み上げるロードマップへと誘導されます。
+ユーザーは AI との温かい対話を通じて自然に登録を終え、日々の「宝石（チェックイン）」を積み上げながら「生きた証」を残していきます。
 
 ```mermaid
 stateDiagram-v2
     [*] --> Entrance: サイト訪問
     
     state Entrance {
-        [*] --> ChatOnboarding: チャット登録 (AI)
-        [*] --> FormRegistration: 手動フォーム登録
+        [*] --> ChatOnboarding: "チャット登録 (AI)"
+        [*] --> FormRegistration: "手動フォーム登録 (評価用)"
     }
     
-    ChatOnboarding --> PersonaExtraction: AIによるペルソナ抽出
-    PersonaExtraction --> ChatOnboarding: 対話継続 (5ターン記憶)
+    ChatOnboarding --> PersonaExtraction: "AIによる登録情報抽出"
+    PersonaExtraction --> ChatOnboarding: "対話継続 (is_complete = false)"
     
-    ChatOnboarding --> Dashboard: 登録完了 (is_complete: true)
-    FormRegistration --> Dashboard: 登録完了
+    ChatOnboarding --> Dashboard: "登録完了 (is_complete = true)"
+    FormRegistration --> Dashboard: "登録完了"
     
     state Dashboard {
         direction TB
-        Roadmap: チェックインカレンダー (ロードマップ)
-        Checklist: 残したいメッセージ (ToDo)
-        LiveProof: 生きた証のステータス
+        Welcome: "今日の挨拶とメッセージ"
+        Roadmap: "継続ストリーク"
     }
     
-    Dashboard --> CheckInAction: チェックイン実行
-    CheckInAction --> Dashboard: 継続ストリーク更新 (宝石の繋がり)
+    state Delivery {
+        [*] --> DeliveryContent: "配信内容からクリック"
+        DeliveryContent --> [*]: "チェックイン"
+    }
 
-    Dashboard --> CompanionChat: 琥珀との対話 (Companion)
-    CompanionChat --> Dashboard: 心境の更新 (Persona Summary)
+    Dashboard --> Delivery: "毎日定期配信"
+    Delivery --> Dashboard: "継続ストリーク更新"
 
-    Dashboard --> JewelryBox: 琥珀の宝石箱 (封印)
-    JewelryBox --> Dashboard: 暗号化鍵画像の保存
+    state Companion {
+        [*] --> CompanionChat: "チャット (配信内容など)"
+        CompanionChat --> [*]: "テスト配信 (自分宛て / サポーター宛て)"
+    }
 
-    Dashboard --> Memorial: 記念ページの公開 (家族用)
-    Memorial --> [*]: 想いの継承
+    Dashboard --> Companion: "琥珀との語らい (Companion)"
+    Companion --> Dashboard: "心境の更新 / プロフィール更新"
+
+    state JewelryBox {
+        [*] --> JewelryBoxChat: "遺言入力"
+        JewelryBoxChat --> [*]: "鍵画像(暗号化キー)の保存"
+    }
+
+    Dashboard --> JewelryBox: "琥珀の宝石箱 (遺言の暗号化保存)"
+    JewelryBox --> Dashboard: "暗号化済み遺言の保存"
+
+    state Emergency {
+        [*] --> EmergencyContact: "緊急連絡内のリンクをクリック"
+        EmergencyContact --> EmergencyPage: "ご家族用ページの表示"
+        EmergencyPage --> Memorial: "記念ページのDL"
+        [*] --> Memorial: "鍵画像で遺言の解錠"
+    }
+
+    Dashboard --> Emergency: "緊急通知の送信 (不活動検知)"
 ```
 
-### ユーザー体験のポイント
-1.  **温かいオンボーディング**: AIエージェントが「監視」ではなく「宝石を守る」というメタファーで対話し、性格や興味（ペルソナ）を理解。
-2.  **PII-Free Context**: 会話履歴ではなく「ペルソナ要約」を保持することで、プライバシーを守りつつ親密な対話を実現。
-3.  **視覚的な継続意欲**: チェックイン履歴が「道（パス）」のように繋がるカレンダーにより、日々の積み重ねを宝石として実感。
-4.  **シームレスな再開**: `localStorage` を活用し、会話の途中からでも、ダッシュボードからでも、訪問時の「挨拶」が時間帯に合わせて変化。
+## 3. 遺言暗号化、鍵画像生成
 
-### アピールポイント：
-4. 究極のプライバシー・バイ・デザイン
-Web Crypto APIを活用し、暗号化処理を100%クライアントサイドで実行。平文のデータがネットワークを流れることのない「トラストレス」な環境を実現しました。
+- **情報の入力**: 暗号化したいコンテンツ（遺言、パスワード等）を入力し、鍵の「素体」となる画像を選択します。
+- **ハイブリッド暗号化**: コンテンツは **AES-256** で暗号化し、その AES 鍵をユーザー固有の **RSA-2048** 公開鍵で保護します。
+- **鍵画像の生成 (電子透かし)**: RSA 秘密鍵をステガノグラフィ技術で画像データの中に不可視な状態で埋め込みます。一目で鍵とわかるよう「ユーザーのニックネーム」を電子透かしとして合成します。
+- **分散管理の徹底**:
+    - **ユーザー**: 秘密鍵を含む「鍵画像」をローカルにダウンロードして保管 (サーバー通信一切なし)。
+    - **サーバー**: 「暗号化済みコンテンツ」と「公開鍵」のみを保持（サーバー側での解錠は不可能）。
+- **継承と解錠**: 万一の際、家族は「記念ページ」にユーザーの「鍵画像」を読み込ませることで、(オフラインの環境でも)ブラウザ上で安全に内容を解錠・閲覧できます。
+- **利便性**: 公開鍵をサーバーに置くことで、鍵画像を再生成（再配布）することなく、遺言の内容のみを何度でも更新可能です。
+
+---
+
+## 4. ユーザー体験のポイント
+1. **温かいオンボーディング**: AIエージェントが「監視」ではなく「宝石を守る」というメタファーで対話。
+2. **PII-Free Context**: 会話履歴ではなく「ペルソナ要約」を保持することで、プライバシーと親密さを両立。
+3. **視覚的な継続意欲**: チェックイン履歴が「道」のように繋がるカレンダーにより、日々の積み重ねを実感。
+4. **究極のプライバシー**: Web Crypto API を活用し、暗号化処理を 100% クライアントサイドで実行する「トラストレス」設計。
