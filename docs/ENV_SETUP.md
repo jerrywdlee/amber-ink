@@ -6,7 +6,7 @@
 
 バックエンドは、ローカルの `podman-compose` または Google Cloud Run で動作します。すべての設定は **プロジェクトのルートディレクトリ** にある `.env` ファイルで行います。
 
-Cloud Run へのデプロイ詳細は [DEPLOYMENT_GUIDE_CLOUDRUN.md](./DEPLOYMENT_GUIDE_CLOUDRUN.md) を参照してください。
+Cloud Run へのデプロイ詳細は [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) を参照してください。
 
 ### 基本設定
 | 変数名 | 説明 | 例 |

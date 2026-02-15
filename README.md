@@ -51,4 +51,4 @@
 - [SYSTEM_SUMMARY.md](./docs/SYSTEM_SUMMARY.md): システム概要・遷移図
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md): アーキテクチャ詳細
 - [ENV_SETUP.md](./docs/ENV_SETUP.md): 環境構築詳細
-- [DEPLOYMENT_GUIDE_CLOUDRUN.md](./docs/DEPLOYMENT_GUIDE_CLOUDRUN.md): Cloud Run デプロイガイド
+- [DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md): デプロイガイド（Cloud Run & GitHub Pages）
