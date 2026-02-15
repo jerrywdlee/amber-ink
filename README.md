@@ -27,15 +27,18 @@
 
 ## 🚀 ローカル開発環境の起動
 
-Podman / Docker を使用して数コマンドで起動できます。
+本プロジェクトはデフォルトで **集約型アーキテクチャ (Aggregated Architecture)** を採用しており、最小限のリソースで全機能を実行できます。
 
-1. **環境変数の設定**: 詳細は [ENV_SETUP.md](./ENV_SETUP.md) を参照。
+1. **環境変数の設定**: 詳細は [ENV_SETUP.md](./docs/ENV_SETUP.md) を参照。
 2. **起動**:
    ```bash
    podman compose up --build
    ```
 3. **アクセス**: 
    - [http://localhost:5173](http://localhost:5173)
+
+### 🧩 その他の構成 (Alternative Architecture)
+より高度な分散開発・検証を行いたい方向けに、各機能を独立したコンテナとして動かす **[純粋なマイクロサービス構成](./extra/pure-microservices/)** も用意しています。詳細は該当ディレクトリの README を参照してください。
 
 ---
 
@@ -45,6 +48,7 @@ Podman / Docker を使用して数コマンドで起動できます。
 - **Admin Token**: 環境変数で設定した `ADMIN_TOKEN` が必要です。
 
 ## 📄 ドキュメント一覧
-- [SYSTEM_SUMMARY.md](./SYSTEM_SUMMARY.md): システム概要・遷移図
-- [ARCHITECTURE.md](./ARCHITECTURE.md): アーキテクチャ詳細
-- [ENV_SETUP.md](./ENV_SETUP.md): 環境構築詳細
+- [SYSTEM_SUMMARY.md](./docs/SYSTEM_SUMMARY.md): システム概要・遷移図
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md): アーキテクチャ詳細
+- [ENV_SETUP.md](./docs/ENV_SETUP.md): 環境構築詳細
+- [DEPLOYMENT_GUIDE_CLOUDRUN.md](./docs/DEPLOYMENT_GUIDE_CLOUDRUN.md): Cloud Run デプロイガイド

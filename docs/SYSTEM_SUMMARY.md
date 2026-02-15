@@ -7,7 +7,7 @@
 
 ## 1. システム構成図 (System Architecture)
 
-バックエンドは Google Cloud Functions / Node.js をベースとし、生成 AI (Gemini API) と NoSQL (MongoDB Atlas) を連携させたマイクロサービス構成です。
+バックエンドは Google Cloud Functions / Node.js をベースとし、生成 AI (Gemini API) と NoSQL (MongoDB Atlas) を連携させたマイクロサービス構成です。運用効率と安定性の観点から、現在は**集約型バックエンド (Aggregated Backend)** を標準構成として採用しています。
 
 ```mermaid
 graph TD

@@ -2,14 +2,17 @@
 
 ## システム構成 (System Architecture)
 
-本プロジェクトは、Gemini API を中核とした対話型フロントエンドと、Google Cloud Functions / MongoDB Atlas を基盤としたサーバーレス・バックエンドで構成される、スケーラブルでセキュアなハイブリッド・アーキテクチャを採用しています。
+本プロジェクトは、運用効率と開発スピードを重視し、**集約型アーキテクチャ (Aggregated / Fat Function)** を標準構成として採用しています。また、高度なスケーラビリティや独立性を必要とする環境向けに、**分散型構成 (Pure Microservices)** への切り替えも可能な柔軟な設計となっています。
 
-### 主要コンポーネント
+### 主要コンポーネント (集約型 - デフォルト)
 - **Frontend**: React (Vite) - 100% クライアントサイドでの暗号化・復号処理 (Web Crypto API)
 - **Backend API**: Node.js (Google Cloud Functions) - ビジネスロジックの集約とデータ永続化の抽象化
 - **Database**: MongoDB (Atlas/Container) - ペルソナ要約、ユーザーデータ、配信履歴の保存
 - **AI Engine**: Google Gemini API (2.5-flash) - 高度な対話、感情解析、パーソナライズされたコンテンツ生成
 - **Delivery Service**: Nodemailer / EJS - 感情に基づいたパーソナライズド・メール配信
+
+## 環境変数・設定管理 (Configuration Management)
+本プロジェクトは **Single Source of Truth（唯一の正）** 原則に基づき、すべてのバックエンド設定をプロジェクトルートの `.env` ファイルに集約しています。これにより、集約型・分散型のどちらのアーキテクチャにおいても、一貫した管理が可能です。
 
 ## データフロー
 
