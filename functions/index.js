@@ -3,7 +3,10 @@
  * 疎結合な「配信エンジン」「AIアナライザー」「対話型オンボーディング」の統合
  */
 
-require('dotenv').config();
+// Load dotenv only if not in Cloud Run/Production environment
+if (!process.env.K_SERVICE) {
+  require('dotenv').config();
+}
 const { MongoClient } = require('mongodb');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cors = require('cors')({ origin: true });
@@ -23,16 +26,35 @@ const cleanJson = (text) => {
 };
 
 let client;
-let db;
 
 async function connectToDb() {
-  if (db) return db;
-  if (!client) {
-    client = new MongoClient(uri);
-    await client.connect();
+  // Check if client exists and is actually connected
+  const isConnected = client && client.topology && client.topology.isConnected();
+
+  if (!client || !isConnected) {
+    console.log(`(Re)connecting to MongoDB... (Target DB: ${dbName})`);
+
+    if (client) {
+      try { await client.close(); } catch (e) { }
+    }
+
+    client = new MongoClient(uri, {
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10
+    });
+
+    try {
+      await client.connect();
+      console.log('Connected successfully to MongoDB Atlas');
+    } catch (err) {
+      console.error('FAILED to connect to MongoDB:', err.message);
+      client = null;
+      throw err;
+    }
   }
-  db = client.db(dbName);
-  return db;
+
+  return client.db(dbName);
 }
 
 /**
@@ -251,7 +273,7 @@ const _companionAgentCore = async (userId, message, isInitial, prevMessages) => 
   }
 
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     generationConfig: { responseMimeType: "application/json" }
   });
 

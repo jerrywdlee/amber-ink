@@ -111,7 +111,7 @@ export function EmergencyStatusView({ userId, userData }) {
                     </h3>
                     <div className="flex flex-col sm:flex-row items-center gap-6">
                         <div className="w-24 h-24 bg-amber-50 rounded-2xl flex items-center justify-center shrink-0 shadow-inner border border-amber-100 overflow-hidden">
-                            <img src={`/keyIcons/${userData.jewelryBox.keyImageName || 'key_01.png'}`} className="w-full h-full object-cover opacity-80" />
+                            <img src={`keyIcons/${userData.jewelryBox.keyImageName || 'key_01.png'}`} className="w-full h-full object-cover opacity-80" />
                         </div>
                         <div className="flex-1">
                             <p className="text-sm text-slate-600 leading-relaxed mb-3">

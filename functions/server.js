@@ -27,6 +27,17 @@ app.get('/downloadMemorial', (req, res) => functions.downloadMemorial(req, res))
 app.post('/emergencyMonitor', (req, res) => functions.emergencyMonitor(req, res));
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('SERVER ERROR:', err);
+    res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message,
+        stack: process.env.NODE_ENV === 'production' ? '🥞' : err.stack
+    });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server listening on port ${PORT}`);
 });

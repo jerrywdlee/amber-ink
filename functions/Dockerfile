@@ -1,4 +1,4 @@
-# Node.js 20 base image
+# Node.js 20 base image (slim version for production efficiency)
 FROM node:20-slim
 
 # Create and change to the app directory.
