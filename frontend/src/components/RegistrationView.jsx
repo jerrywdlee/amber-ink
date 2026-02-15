@@ -74,7 +74,7 @@ export const RegistrationView = ({
                 </div>
                 <div className="space-y-4 text-sm">
                     <div>
-                        <label className="block text-amber-700 mb-1 ml-2">お名前</label>
+                        <label className="block text-amber-700 mb-1 ml-2">お名前 (ニックネームでも可)</label>
                         <input
                             className="w-full p-4 rounded-2xl bg-white/50 border border-white/50 focus:ring-2 ring-amber-400 outline-none"
                             placeholder="琥珀 太郎"

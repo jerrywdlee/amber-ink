@@ -116,10 +116,6 @@ exports.onboardingAgent = (req, res) => {
       [Last Conversation History]
       ${prevMessages ? JSON.stringify(prevMessages.slice(-16)) : 'No conversation history.'}
       
-      [CRITICAL RULE: Handling PII]
-      - NEVER include names, specific addresses, phone numbers, email addresses, or IDs in the "updated_persona_summary".
-      - Focus on the user's "speaking style, personality, values, interests, and life background".
-
       [YOUR MISSION]
       Gather the following information through natural conversation:
       1. Name (nickname preferred)
@@ -133,11 +129,21 @@ exports.onboardingAgent = (req, res) => {
       - Keep responses concise (approx. 1-2 sentences per message).
       - Use [SPLIT] to separate messages if you need to say more or break the flow.
       - Ask only ONE question at a time.
-      - Ensure every response includes a confirmation or a question to keep the flow until complete.
+      - ENSURE every response includes a confirmation or a question to keep the flow until complete.
       - When asking about Interests/Passions, provide a few relatable examples (e.g., gardening, cooking, latest news, health) to help the user answer.
       - When asking for contact info (delivery or emergency), EXPLICITLY ask the user to provide their "Email address or Phone number" (メールアドレスか電話番号).
       - When asking for contact info, emphasize the benefit: "delivering news and topics you're interested in".
       - If you have all information, express gratitude and set is_complete to true.
+
+      [PII PROTECTION (STRICT)]
+      - NEVER include real names, specific addresses, phone numbers, or email addresses in the "updated_persona_summary". Use general expressions instead.
+
+      [IMPORTANT: PERSONA SUMMARY LANGUAGE & TONE]
+      - The "updated_persona_summary" MUST be written in **JAPANESE**.
+      - This summary is displayed to the user's FAMILY on the safety confirmation page.
+      - Use warm, polite, and respectful phrasing (e.g., "最近はイタリア語の学習を楽しまれているようです" instead of "興味：イタリア語").
+      - Capture the "temperature" of their heart while maintaining their dignity.
+      - Since this is the onboarding phase, capture their initial openness and feelings about starting this journey.
 
       [OUTPUT FORMAT (JSON ONLY)]
       {
@@ -163,6 +169,8 @@ exports.onboardingAgent = (req, res) => {
       const responseText = result.response.text();
       const responseData = JSON.parse(cleanJson(responseText));
 
+      console.log('responseData', responseData);
+
       // 4. セッションデータの更新 (extracted_data は常に更新、personaSummary は完了時のみ)
       const updatePayload = {
         extractedData: responseData.extracted_data,
@@ -170,7 +178,7 @@ exports.onboardingAgent = (req, res) => {
         updatedAt: new Date()
       };
 
-      if (responseData.is_complete) {
+      if (responseData.updated_persona_summary) {
         updatePayload.personaSummary = responseData.updated_persona_summary;
       }
 
@@ -195,6 +203,7 @@ exports.onboardingAgent = (req, res) => {
                 contact_method,
                 emergency_contact,
                 emergency_method,
+                personaSummary: responseData.updated_persona_summary,
                 status: 'active',
                 updatedAt: new Date()
               },
@@ -205,6 +214,14 @@ exports.onboardingAgent = (req, res) => {
             },
             { upsert: true }
           );
+
+          // 登録完了後、セッションを削除してクリーンアップ
+          try {
+            await sessions.deleteOne({ userId, appId });
+            console.log(`Session cleaned up for user ${userId}`);
+          } catch (e) {
+            console.error('Session cleanup failed:', e);
+          }
 
           // 保存済みの最新データをresponseDataに含める
           const updatedUser = await users.findOne({ userId, appId });
@@ -327,6 +344,7 @@ const _companionAgentCore = async (userId, message, isInitial, prevMessages) => 
 
         [PROFILE & PERSONA UPDATES]
         - If the user mentions changing their name, interests, or contact info, extract the updates.
+        - **PII PROTECTION (STRICT)**: NEVER include real names, specific addresses, phone numbers, or email addresses in the "updated_persona_summary". Use general expressions instead.
         - **EMOTIONAL SENSITIVITY**: Pay close attention to the user's emotional state (tired, lonely, happy, reflective, etc.).
         - If you sense a shift in their heart or mood, ACTIVELY update "updated_persona_summary" to reflect their current "vibe."
         - **IMPORTANT: PERSONA SUMMARY LANGUAGE & TONE**:
@@ -754,11 +772,11 @@ exports.registerUser = (req, res) => {
 
       const database = await connectToDb();
       const users = database.collection('users');
-      const sessions = database.collection('sessions');
+      // const sessions = database.collection('sessions');
 
       // セッションからペルソナ要約を読み取る
-      const sessionDoc = await sessions.findOne({ userId, appId });
-      const personaSummary = sessionDoc ? sessionDoc.personaSummary : '親しい友人。';
+      // const sessionDoc = await sessions.findOne({ userId, appId });
+      // const personaSummary = sessionDoc ? sessionDoc.personaSummary : '親しい友人。';
 
       const payload = { ...req.body, updatedAt: new Date() };
 
@@ -780,13 +798,13 @@ exports.registerUser = (req, res) => {
         { projection: { checkins: { $slice: -20 } } }
       );
 
-      // 登録完了後、セッションを削除してクリーンアップ
-      try {
-        await sessions.deleteOne({ userId, appId });
-        console.log(`Session cleaned up for user ${userId}`);
-      } catch (e) {
-        console.error('Session cleanup failed:', e);
-      }
+      // // 登録完了後、セッションを削除してクリーンアップ
+      // try {
+      //   await sessions.deleteOne({ userId, appId });
+      //   console.log(`Session cleaned up for user ${userId}`);
+      // } catch (e) {
+      //   console.error('Session cleanup failed:', e);
+      // }
 
       res.status(201).json(savedUser);
     } catch (error) {
