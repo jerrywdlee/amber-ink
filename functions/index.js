@@ -161,7 +161,7 @@ exports.onboardingAgent = (req, res) => {
       }
     `;
 
-      console.log('systemInstruction', systemInstruction);
+      // console.log('systemInstruction', systemInstruction);
 
       // 3. Gemini による応答生成
       const result = await model.generateContent(`User message: "${message}"\n\n${systemInstruction}`);

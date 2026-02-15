@@ -52,7 +52,8 @@ export const CompanionChatView = ({
             <div className="flex flex-wrap items-center gap-2 mt-2 mb-1 px-1">
                 <button
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 ${isMenuOpen ? 'bg-amber-100 text-amber-900 border-amber-200' : 'bg-amber-500 text-white shadow-md shadow-amber-500/20 rotate-0'} border active:scale-90`}
+                    disabled={isTypingCompanion}
+                    className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 ${isMenuOpen ? 'bg-amber-100 text-amber-900 border-amber-200' : 'bg-amber-500 text-white shadow-md shadow-amber-500/20 rotate-0'} border active:scale-90 ${isTypingCompanion ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {isMenuOpen ? <X size={16} /> : <Plus size={18} />}
                 </button>
@@ -92,7 +93,8 @@ export const CompanionChatView = ({
                 {companionSuggestions.length === 0 && (
                     <button
                         onClick={() => handleSendCompanionMessage("前回届いた配信の内容を教えて")}
-                        className="px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform whitespace-nowrap"
+                        disabled={isTypingCompanion}
+                        className={`px-3 py-1.5 bg-white/60 backdrop-blur-md border border-white/50 rounded-full text-[10px] font-bold text-amber-800 shadow-xs active:scale-95 transition-transform whitespace-nowrap ${isTypingCompanion ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         前回の配信
                     </button>
@@ -101,24 +103,27 @@ export const CompanionChatView = ({
                     <button
                         key={i}
                         onClick={() => handleSendCompanionMessage(s.value || s)}
-                        className="px-3 py-1.5 bg-amber-500/10 backdrop-blur-md border border-amber-500/20 rounded-full text-[10px] font-bold text-amber-700 shadow-xs active:scale-95 transition-transform"
+                        disabled={isTypingCompanion}
+                        className={`px-3 py-1.5 bg-amber-500/10 backdrop-blur-md border border-amber-500/20 rounded-full text-[10px] font-bold text-amber-700 shadow-xs active:scale-95 transition-transform ${isTypingCompanion ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {s.label || s}
                     </button>
                 ))}
             </div>
 
-            <GlassCard className="p-2 rounded-full flex items-center mt-4 border-amber-200/50 shadow-amber-500/10">
+            <GlassCard className={`p-2 rounded-full flex items-center mt-4 border-amber-200/50 shadow-amber-500/10 ${isTypingCompanion ? 'opacity-70' : ''}`}>
                 <input
-                    className="flex-1 bg-transparent px-5 py-3 outline-none text-amber-900 placeholder-amber-700/50 font-medium"
-                    placeholder="琥珀に話しかける..."
+                    className="flex-1 bg-transparent px-5 py-3 outline-none text-amber-900 placeholder-amber-700/50 font-medium disabled:cursor-not-allowed"
+                    placeholder={isTypingCompanion ? "琥珀が考え中です..." : "琥珀に話しかける..."}
                     value={inputValue}
+                    disabled={isTypingCompanion}
                     onChange={(e) => setInputValue(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendCompanionMessage()}
+                    onKeyPress={(e) => e.key === 'Enter' && !isTypingCompanion && handleSendCompanionMessage()}
                 />
                 <button
                     onClick={handleSendCompanionMessage}
-                    className="w-11 h-11 bg-amber-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-95 transition-transform"
+                    disabled={isTypingCompanion || !inputValue.trim()}
+                    className={`w-11 h-11 bg-amber-500 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${isTypingCompanion || !inputValue.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:scale-95'}`}
                 >
                     <Send className="w-5 h-5" />
                 </button>
