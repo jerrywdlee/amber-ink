@@ -1,4 +1,4 @@
-# Node.js 20 base image
+# Node.js 20 base image (slim version for production efficiency)
 FROM node:20-slim
 
 # Create and change to the app directory.
@@ -19,5 +19,4 @@ COPY . .
 ENV FUNCTION_TARGET=onboardingAgent
 
 # Run the web service on container startup.
-# The functions-framework listens on port 8080 by default.
-CMD exec npx @google-cloud/functions-framework --target=$FUNCTION_TARGET
+CMD ["node", "server.js"]

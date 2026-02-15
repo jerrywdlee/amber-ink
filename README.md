@@ -5,46 +5,50 @@
 孤独死・社会的孤立を防ぐ安否確認エージェント。
 「監視」ではなく、AIが生成する「日常の彩り（ニュース、趣味情報等）」を届けることで、ポジティブな生存確認と「生きた証」の保護を実現します。
 
-## 🌟 主な機能
-- **琥珀の宝石箱（Jewelry Box）**: 未来の家族へ残したい「想い」を、RSAハイブリッド暗号と電子透かし（ステガノグラフィ）で鍵画像に封印。
-- **コンパニオンチャット**: 琥珀（Amber）との日常的な対話。感情の揺れを汲み取り、安否確認ページへの反映や柔軟な提案。
-- **ポジティブ安否確認**: 義務的な生存確認ではなく、興味に合わせたニュース配信を通じて「繋がっている安心感」を提供。
-- **継続ストリーク**: 日々のチェックインを宝石のように繋いでいくロードマップUI。
-- **セキュアアーキテクチャ**: AES/RSA暗号化、Admin Token認証、サーバーサイドAPIによる堅牢な保護。
+## 🌟 公開 URL (Live Demo)
+[jerrywdlee.github.io/amber-ink](https://jerrywdlee.github.io/amber-ink)
 
-## 🚀 クイックスタート（ローカルデモ環境）
+---
 
-このプロジェクトは、Podman / Dockerを使用して数コマンドで起動できます。
+## 💎 主な機能
+- **琥珀の宝石箱 (Jewelry Box)**: 未来の家族へ残したい「想い」を、AES/RSA ハイブリッド暗号と**ステガノグラフィ (電子透かし)** により画像に封印。
+- **琥珀との語らい (Companion)**: 安否確認。感情の変化を汲み取り、安否確認ページへの反映をリアルタイムに実施。
+- **ポジティブ安否確認**: 興味に合わせたニュースや挨拶を毎日メールで受信。リンクをクリックするだけでチェックインが完了。
+- **継続ストリーク**: 日々のチェックインを宝石のように繋いでいく、直感的なロードマップ UI。
+- **家族用安否確認ページ**: ステータス報告と、暗号化された遺言の解読（鍵画像を使用）が可能。
 
-### 1. 環境変数の設定
-`frontend` と `functions` のそれぞれに `.env` を作成します。
-(詳細は [ENV_SETUP.md](./ENV_SETUP.md) を参照)
+## 🛠 技術スタック (Technical Stack)
+- **Frontend**: React, Vite, Tailwind CSS, Web Crypto API
+- **Backend**: Node.js, Google Cloud Functions, Nodemailer (EJS)
+- **Database**: MongoDB Atlas
+- **AI**: Google Gemini 2.5-flash
 
-```bash
-# Gemini API Key を取得して設定してください
-cp frontend/.env.example frontend/.env
-cp functions/.env.example functions/.env
-```
+---
 
-### 2. アプリケーションの起動
-```bash
-podman compose up --build
-```
+## 🚀 ローカル開発環境の起動
 
-### 3. アクセス
-- **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **MongoDB**: [localhost:27017]
+本プロジェクトはデフォルトで **集約型アーキテクチャ (Aggregated Architecture)** を採用しており、最小限のリソースで全機能を実行できます。
 
-## 🛠 管理機能 (管理者用)
+1. **環境変数の設定**: 詳細は [ENV_SETUP.md](./docs/ENV_SETUP.md) を参照。
+2. **起動**:
+   ```bash
+   podman compose up --build
+   ```
+3. **アクセス**: 
+   - [http://localhost:5173](http://localhost:5173)
 
-システム管理者向けのデバッグ・運用管理用ダッシュボードが用意されています。
+### 🧩 その他の構成 (Alternative Architecture)
+より高度な分散開発・検証を行いたい方向けに、各機能を独立したコンテナとして動かす **[純粋なマイクロサービス構成](./extra/pure-microservices/)** も用意しています。詳細は該当ディレクトリの README を参照してください。
 
-- **URL**: [http://localhost:5173/?view=admin](http://localhost:5173/?view=admin)
-- **機能**: 
-  - 特定ユーザーまたは全員を対象としたAI配信コンテンツの生成（runAiAnalyzer）
-  - 配信スケジュールの強制実行（runDeliveryEngine）
+---
+
+## 🛠 管理者用ダッシュボード
+
+- **URL**: `?view=admin` パラメータでアクセス。
+- **Admin Token**: 環境変数で設定した `ADMIN_TOKEN` が必要です。
 
 ## 📄 ドキュメント一覧
-- [SYSTEM_SUMMARY.md](./SYSTEM_SUMMARY.md): 中間発表用システム概要・遷移図
-- [ARCHITECTURE.md](./ARCHITECTURE.md): 技術構成・データフロー詳細
-- [ENV_SETUP.md](./ENV_SETUP.md): 環境構築詳細
+- [SYSTEM_SUMMARY.md](./docs/SYSTEM_SUMMARY.md): システム概要・遷移図
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md): アーキテクチャ詳細
+- [ENV_SETUP.md](./docs/ENV_SETUP.md): 環境構築詳細
+- [DEPLOYMENT_GUIDE_CLOUDRUN.md](./docs/DEPLOYMENT_GUIDE_CLOUDRUN.md): Cloud Run デプロイガイド

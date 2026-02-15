@@ -15,10 +15,10 @@ export const JewelryBoxView = ({ userData, updateUserMetadata }) => {
     const chatEndRef = useRef(null);
 
     const keyIcons = [
-        '/keyIcons/key_01.png',
-        '/keyIcons/key_02.png',
-        '/keyIcons/key_03.png',
-        '/keyIcons/key_04.png',
+        'keyIcons/key_01.png',
+        'keyIcons/key_02.png',
+        'keyIcons/key_03.png',
+        'keyIcons/key_04.png',
     ];
 
     const sequenceStarted = useRef(false);
@@ -110,14 +110,14 @@ export const JewelryBoxView = ({ userData, updateUserMetadata }) => {
                         <div className="flex justify-center">
                             <GlassCard
                                 onClick={() => {
-                                    setSelectedIcon(`/keyIcons/${userData.jewelryBox.keyImageName}`);
+                                    setSelectedIcon(`keyIcons/${userData.jewelryBox.keyImageName}`);
                                     setModalView('choice');
                                 }}
                                 className="w-[140px] p-2 flex flex-col items-center gap-2 border-white/60 shadow-amber-500/10 hover:bg-white/40 active:scale-95 transition-all cursor-pointer"
                             >
                                 <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-amber-50 shadow-inner">
                                     <img
-                                        src={`/keyIcons/${userData.jewelryBox.keyImageName}`}
+                                        src={`keyIcons/${userData.jewelryBox.keyImageName}`}
                                         alt="Sealed Memory"
                                         className="w-full h-full object-cover"
                                     />
@@ -253,7 +253,7 @@ export const JewelryBoxView = ({ userData, updateUserMetadata }) => {
                                     <div className="relative group mx-auto w-32 h-32 cursor-pointer" onClick={() => document.getElementById('key-file-input').click()}>
                                         <div className="absolute inset-0 bg-amber-500/20 rounded-2xl animate-pulse group-hover:hidden" />
                                         <div className="w-full h-full rounded-2xl overflow-hidden border-2 border-amber-300 shadow-md transform rotate-3 transition-all duration-500 group-hover:rotate-0 group-hover:grayscale-0 grayscale opacity-80 group-hover:opacity-100 bg-amber-100">
-                                            <img src={`/keyIcons/${userData.jewelryBox.keyImageName}`} className="w-full h-full object-cover" />
+                                            <img src={`keyIcons/${userData.jewelryBox.keyImageName}`} className="w-full h-full object-cover" />
                                         </div>
                                         <div className="absolute -bottom-2 -right-2 bg-amber-600 text-white p-2 rounded-full shadow-lg transition-transform group-hover:scale-110">
                                             <ImageUp size={16} />
@@ -389,7 +389,7 @@ export const JewelryBoxView = ({ userData, updateUserMetadata }) => {
                     <GlassCard className="relative w-full max-w-sm p-8 rounded-[2.5rem] border-white/60 shadow-2xl animate-in zoom-in-95 duration-300 text-center">
                         <div className="w-24 h-24 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner overflow-hidden border-2 border-amber-200">
                             {successData.isUpdate && userData?.jewelryBox?.keyImageName ? (
-                                <img src={`/keyIcons/${userData.jewelryBox.keyImageName}`} className="w-full h-full object-cover" />
+                                <img src={`keyIcons/${userData.jewelryBox.keyImageName}`} className="w-full h-full object-cover" />
                             ) : (
                                 <Gem size={40} className="text-amber-600 animate-pulse" />
                             )}
