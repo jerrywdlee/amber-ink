@@ -11,12 +11,12 @@ This directory contains the configuration for running Amber Ink in a distributed
 
 You can run this architecture **without** overwriting your current `.env` files by using specific parameters.
 
-### 1. Backend (Podman/Docker Compose)
+### 1. Backend (Docker Compose)
 Backend functions use the **project root's `.env` file**. To ensure variables are correctly mapped, run the following command from the **Project Root Directory**:
 
 ```bash
 # --env-file .env を指定することで、YAML内の変数（GEMINI_API_KEY等）が正しく置換されます
-podman compose -f extra/pure-microservices/docker-compose.yml --env-file .env up --build
+docker compose -f extra/pure-microservices/docker-compose.yml --env-file .env up --build
 ```
 
 ### 2. Frontend (Vite)

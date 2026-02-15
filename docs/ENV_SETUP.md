@@ -4,7 +4,7 @@
 
 ## 1. Backend: Functions (`.env`)
 
-バックエンドは、ローカルの `podman-compose` または Google Cloud Run で動作します。すべての設定は **プロジェクトのルートディレクトリ** にある `.env` ファイルで行います。
+バックエンドは、ローカルの `docker-compose` または Google Cloud Run で動作します。すべての設定は **プロジェクトのルートディレクトリ** にある `.env` ファイルで行います。
 
 Cloud Run へのデプロイ詳細は [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) を参照してください。
 
@@ -69,7 +69,7 @@ Cloud Run へのデプロイ詳細は [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.m
 
 ### A. 集約型構成 (Aggregated - デフォルト)
 すべての機能が 1 つのコンテナ内で動作します（ポート 8080）。本番環境（Cloud Run）に近く、セットアップが最も簡単です。
-- **実行コマンド**: `podman compose up`
+- **実行コマンド**: `docker compose up`
 - **Frontend 設定**: すべての `VITE_..._URL` 項目を `http://localhost:8080` 配下のパスに設定。
 
 ### B. 分散型構成 (Pure Microservices)

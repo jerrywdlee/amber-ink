@@ -32,7 +32,7 @@
 1. **環境変数の設定**: 詳細は [ENV_SETUP.md](./docs/ENV_SETUP.md) を参照。
 2. **起動**:
    ```bash
-   podman compose up --build
+   docker compose up --build
    ```
 3. **アクセス**: 
    - [http://localhost:5173](http://localhost:5173)
