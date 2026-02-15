@@ -52,3 +52,4 @@
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md): アーキテクチャ詳細
 - [ENV_SETUP.md](./docs/ENV_SETUP.md): 環境構築詳細
 - [DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md): デプロイガイド（Cloud Run & GitHub Pages）
+- [AI_DEVELOPMENT_EFFORT_REPORT.md](./docs/AI_DEVELOPMENT_EFFORT_REPORT.md): AI開発工数・コスト比較レポート
