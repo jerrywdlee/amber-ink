@@ -5,8 +5,13 @@
 孤独死・社会的孤立を防ぐ安否確認エージェント。
 「監視」ではなく、AIが生成する「日常の彩り（ニュース、趣味情報等）」を届けることで、ポジティブな生存確認と「生きた証」の保護を実現します。
 
+## 📝 開発ブログ (Article)
+- [AIエージェントとステガノグラフィーで創る、想いの継承プラットフォーム『Amber Ink』](https://zenn.dev/julia_caesaris/articles/88233f487dbaf1)
+
+<!--
 ## 🌟 公開 URL (Live Demo)
 [jerrywdlee.github.io/amber-ink](https://jerrywdlee.github.io/amber-ink)
+-->
 
 ---
 
